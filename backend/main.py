@@ -83,6 +83,7 @@ def search_imdb(query: str):
         resp = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
         data = json.loads(resp)
         results = []
+        seen = set()
         for item in data.get('d', []):
             if item.get('qid') not in ["movie", "tvSeries", "tvMiniSeries"]:
                 continue
@@ -91,7 +92,12 @@ def search_imdb(query: str):
             title = item.get('l', '')
             year = item.get('y', '')
             if not year and item.get('yr'):
-                year = item.get('yr').split('-')[0]
+                year = str(item.get('yr')).split('-')[0]
+                
+            sig = f"{mt}-{title}-{year}"
+            if sig in seen:
+                continue
+            seen.add(sig)
                 
             img = item.get('i', {}).get('imageUrl', f"https://via.placeholder.com/200x300/121212/ffffff?text={urllib.parse.quote(title)}")
             
