@@ -317,22 +317,41 @@ def score_link(link: str) -> int:
     score = 0
     link_lower = link.lower()
     
-    if any(k in link_lower for k in ['2160p', '4k', 'uhd']):
-        score += 2000
-    elif '1080p' in link_lower:
+    # Normalize codecs (e.g. h.264 -> h264)
+    normalized_link = link_lower.replace('h.264', 'h264').replace('h.265', 'h265')
+    
+    # Resolution (1080p is the sweet spot for VPS streaming without transcoding)
+    if '1080p' in normalized_link:
         score += 1000
-    elif '720p' in link_lower:
+    elif '720p' in normalized_link:
         score += 500
+    elif any(k in normalized_link for k in ['2160p', '4k', 'uhd']):
+        score -= 500 # 4K almost always transcodes unless the client is perfect
         
-    if any(k in link_lower for k in ['h264', 'x264', 'avc']):
+    # Video Codec (H.264 is the undisputed king of Direct Play compatibility)
+    if any(k in normalized_link for k in ['h264', 'x264', 'avc']):
         score += 5000
-    if any(k in link_lower for k in ['hevc', 'x265', 'h265']):
-        score -= 100
+    elif any(k in normalized_link for k in ['hevc', 'x265', 'h265']):
+        score -= 500
         
-    if ".mkv" in link_lower:
-        score += 50
+    # Source (WEB-DLs are pre-optimized for streaming. BluRays have exotic codecs that force transcodes)
+    if 'web-dl' in normalized_link or 'webrip' in normalized_link:
+        score += 2000
+    if 'bluray' in normalized_link or 'bdrip' in normalized_link or 'remux' in normalized_link:
+        score -= 1000
         
-    if link_lower.endswith(".mkv") or link_lower.endswith(".mp4"):
+    # Audio Codec (AAC is universal. DTS/TrueHD force audio transcoding)
+    if 'aac' in normalized_link:
+        score += 1000
+    if 'ddp' in normalized_link or 'eac3' in normalized_link or 'ac3' in normalized_link:
+        score += 500
+    if 'dts' in normalized_link or 'truehd' in normalized_link:
+        score -= 1000
+        
+    # Container
+    if normalized_link.endswith('.mp4'):
+        score += 15000
+    elif normalized_link.endswith('.mkv'):
         score += 10000
         
     return score
