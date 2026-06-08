@@ -124,12 +124,12 @@ class Universal111477Provider(Provider):
     def search_provider(self, query: str, media_type: str = "auto") -> list[dict]:
         global _SEARCH_CACHE
         
-        dirs_to_fetch = ["/movies/", "/tvs/", "/kdrama/", "/asiandrama/"]
+        dirs_to_fetch = ["/movies/", "/tvs/", "/kdrama/", "/asiandrama/", "/misc/anime/"]
         
         if media_type == "movie":
             dirs_to_fetch = ["/movies/"]
         elif media_type == "tv":
-            dirs_to_fetch = ["/tvs/", "/kdrama/", "/asiandrama/"]
+            dirs_to_fetch = ["/tvs/", "/kdrama/", "/asiandrama/", "/misc/anime/"]
             
         all_matches = []
         
