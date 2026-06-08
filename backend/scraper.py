@@ -108,14 +108,26 @@ class Universal111477Provider(Provider):
     name = "111477.xyz Universal"
 
     def fetch_html(self, url: str) -> str:
+        from urllib.parse import quote, urlparse, unquote
+        
+        if not url.endswith('/') and not url.endswith('.mkv') and not url.endswith('.mp4'):
+            url += '/'
+            
+        parsed = urlparse(url)
+        safe_path = quote(unquote(parsed.path))
+        safe_url = f"{parsed.scheme}://{parsed.netloc}{safe_path}"
+        if parsed.query:
+            safe_url += f"?{quote(unquote(parsed.query))}"
+            
         req = urllib.request.Request(
-            url, 
+            safe_url, 
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         )
         try:
             with urllib.request.urlopen(req, timeout=10) as response:
                 return response.read().decode('utf-8', errors='ignore')
-        except Exception:
+        except Exception as e:
+            print(f"fetch_html failed for {safe_url}: {e}")
             return ""
 
     def health_check(self) -> bool:
@@ -179,14 +191,19 @@ class Universal111477Provider(Provider):
         html = self.fetch_html(anime_url)
         if not html: return []
         
-        matches = re.findall(r'data-name="([^"]+)".*?data-url="([^"]+)"', html)
+        matches = re.findall(r'data-name="([^"]+)".*?data-url="([^"]+)"(?:.*?data-sort="([^"]+)")?', html)
         
         all_links = []
         directories_to_crawl = []
+        MAX_BYTES = 10 * 1024**3 # 10GB limit
         
-        for name, url_path in matches:
+        for name, url_path, size_str in matches:
             name_lower = name.lower()
             if name_lower.endswith('.mkv') or name_lower.endswith('.mp4'):
+                # Enforce file size limit natively if size is available
+                if size_str and size_str.isdigit() and int(size_str) > MAX_BYTES:
+                    continue
+                    
                 full_url = urljoin("https://a.111477.xyz", url_path)
                 all_links.append((name, full_url))
             elif url_path.endswith('/') and name_lower not in ["asiandrama", "kdrama", "misc", "movies", "tvs"]:
@@ -208,10 +225,12 @@ class Universal111477Provider(Provider):
                 for future in concurrent.futures.as_completed(futures):
                     sub_html = future.result()
                     if sub_html:
-                        sub_matches = re.findall(r'data-name="([^"]+)".*?data-url="([^"]+)"', sub_html)
-                        for sub_name, sub_url_path in sub_matches:
+                        sub_matches = re.findall(r'data-name="([^"]+)".*?data-url="([^"]+)"(?:.*?data-sort="([^"]+)")?', sub_html)
+                        for sub_name, sub_url_path, sub_size_str in sub_matches:
                             sub_name_lower = sub_name.lower()
                             if sub_name_lower.endswith('.mkv') or sub_name_lower.endswith('.mp4'):
+                                if sub_size_str and sub_size_str.isdigit() and int(sub_size_str) > MAX_BYTES:
+                                    continue
                                 sub_full = urljoin("https://a.111477.xyz", sub_url_path)
                                 all_links.append((sub_name, sub_full))
         
