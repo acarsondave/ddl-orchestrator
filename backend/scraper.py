@@ -109,6 +109,8 @@ class Universal111477Provider(Provider):
 
     def fetch_html(self, url: str) -> str:
         from urllib.parse import quote, urlparse, unquote
+        import urllib.error
+        import time
         
         if not url.endswith('/') and not url.endswith('.mkv') and not url.endswith('.mp4'):
             url += '/'
@@ -123,12 +125,23 @@ class Universal111477Provider(Provider):
             safe_url, 
             headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         )
-        try:
-            with urllib.request.urlopen(req, timeout=10) as response:
-                return response.read().decode('utf-8', errors='ignore')
-        except Exception as e:
-            print(f"fetch_html failed for {safe_url}: {e}")
-            return ""
+        
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    return response.read().decode('utf-8', errors='ignore')
+            except urllib.error.HTTPError as e:
+                if e.code in [429, 500, 502, 503, 504]:
+                    print(f"fetch_html attempt {attempt+1} got {e.code} for {safe_url}. Retrying...")
+                    time.sleep(2 ** attempt)
+                    continue
+                else:
+                    print(f"fetch_html failed for {safe_url}: {e}")
+                    return ""
+            except Exception as e:
+                print(f"fetch_html failed for {safe_url}: {e}")
+                return ""
+        return ""
 
     def health_check(self) -> bool:
         html = self.fetch_html("https://a.111477.xyz/")

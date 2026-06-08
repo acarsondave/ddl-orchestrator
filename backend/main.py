@@ -165,6 +165,8 @@ def request_anime(payload: RequestAnimePayload, _=Depends(verify_token)):
             
         push_to_jdownloader(payload.anime_name, best_links)
         return {"status": "success", "message": f"Pushed {len(best_links)} links to JDownloader."}
+    except HTTPException:
+        raise
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
