@@ -10,7 +10,7 @@ class Provider:
     def health_check(self) -> bool:
         raise NotImplementedError
 
-    def get_episodes(self, anime_url: str, anime_name: str = "") -> list[str]:
+    def get_episodes(self, anime_url: str, anime_name: str = "", media_type: str = "auto") -> list[str]:
         raise NotImplementedError
 
     def get_links(self, episode_url: str) -> list[str]:
@@ -35,7 +35,7 @@ class TokyoInsiderProvider(Provider):
         html = self.fetch_html("https://www.tokyoinsider.com")
         return bool(html and "Tokyo Insider" in html)
 
-    def get_episodes(self, anime_url: str, anime_name: str = "") -> list[str]:
+    def get_episodes(self, anime_url: str, anime_name: str = "", media_type: str = "auto") -> list[str]:
         html = self.fetch_html(anime_url)
         if not html: return []
         
@@ -76,7 +76,7 @@ class Universal111477Provider(Provider):
         html = self.fetch_html("https://a.111477.xyz/")
         return "Index of" in html or bool(html)
 
-    def get_episodes(self, anime_url: str, anime_name: str = "") -> list[str]:
+    def get_episodes(self, anime_url: str, anime_name: str = "", media_type: str = "auto") -> list[str]:
         html = self.fetch_html(anime_url)
         if not html: return []
         
@@ -89,8 +89,13 @@ class Universal111477Provider(Provider):
                 full_url = urljoin("https://a.111477.xyz", url_path)
                 all_links.append((name, full_url))
                 
-        is_tv = "[TV]" in anime_name or "Season" in anime_url or "Episode" in anime_url
-        is_movie = "[MOVIE]" in anime_name
+        if media_type == "movie":
+            is_movie, is_tv = True, False
+        elif media_type == "tv":
+            is_movie, is_tv = False, True
+        else:
+            is_tv = "[TV]" in anime_name or "Season" in anime_url or "Episode" in anime_url
+            is_movie = "[MOVIE]" in anime_name
         
         if is_movie and not is_tv:
             best = self._pick_best(all_links)
@@ -151,7 +156,7 @@ def score_link(link: str) -> int:
         score += 500
         
     if any(k in link_lower for k in ['h264', 'x264', 'avc']):
-        score += 200
+        score += 5000
     if any(k in link_lower for k in ['hevc', 'x265', 'h265']):
         score -= 100
         
@@ -164,12 +169,12 @@ def get_best_link(links: list[str]) -> str | None:
     if not links: return None
     return sorted(links, key=score_link, reverse=True)[0]
 
-def scrape_best_links(provider_id: str, anime_url: str, anime_name: str = "", max_workers: int = 5) -> list[str]:
+def scrape_best_links(provider_id: str, anime_url: str, anime_name: str = "", media_type: str = "auto", max_workers: int = 5) -> list[str]:
     provider = registry.get(provider_id)
     if not provider:
         raise ValueError("Invalid provider ID")
 
-    episodes = provider.get_episodes(anime_url, anime_name)
+    episodes = provider.get_episodes(anime_url, anime_name, media_type)
     best_links = []
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:

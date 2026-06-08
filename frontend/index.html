@@ -91,17 +91,33 @@
             </div>
             
             <div class="input-group">
+                <select id="media-type-select" class="provider-select">
+                    <option value="auto">Auto-Detect (Based on Title / Filenames)</option>
+                    <option value="movie">Force Movie (Picks 1 Best Link Overall)</option>
+                    <option value="tv">Force TV Show (Picks 1 Best Link Per Episode)</option>
+                </select>
+            </div>
+            
+            <div class="input-group">
                 <input type="url" id="provider-url" placeholder="Enter provider URL...">
             </div>
             
-            <div class="modal-actions">
+            <div class="modal-actions" style="display: flex; gap: 8px;">
                 <button id="cancel-modal" class="btn-secondary">Cancel</button>
+                <button id="test-extraction" class="btn-secondary" disabled>Dry Run</button>
                 <button id="submit-request" class="btn-primary" disabled>
                     <span id="submit-text">Send to JDownloader</span>
                     <div id="submit-spinner" class="spinner-small hidden"></div>
                 </button>
             </div>
-            <div id="modal-status" class="status-text hidden"></div>
+            <div id="modal-status" class="status-text hidden" style="margin-top: 10px;"></div>
+            
+            <!-- Container for Dry Run Results -->
+            <div id="dry-run-results" class="hidden" style="margin-top: 15px; max-height: 200px; overflow-y: auto; text-align: left; background: var(--bg-tertiary); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+                <h4 style="margin: 0 0 10px 0; font-size: 14px; color: var(--text-primary);">Extracted Links:</h4>
+                <ul id="dry-run-list" style="list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--text-secondary); word-break: break-all;">
+                </ul>
+            </div>
         </div>
     </div>
 

@@ -35,6 +35,8 @@ class RequestAnimePayload(BaseModel):
     provider_id: str
     anime_name: str
     anime_url: HttpUrl
+    media_type: str = "auto"
+    dry_run: bool = False
 
 @app.get("/api/providers")
 def list_providers(_=Depends(verify_token)):
@@ -105,10 +107,13 @@ async def search_anime(q: str, _=Depends(verify_token)):
 @app.post("/api/request")
 def request_anime(payload: RequestAnimePayload, _=Depends(verify_token)):
     try:
-        best_links = scrape_best_links(payload.provider_id, str(payload.anime_url), payload.anime_name)
+        best_links = scrape_best_links(payload.provider_id, str(payload.anime_url), payload.anime_name, payload.media_type)
         if not best_links:
             raise HTTPException(status_code=404, detail="No valid download links found.")
         
+        if payload.dry_run:
+            return {"status": "success", "links": best_links}
+            
         push_to_jdownloader(payload.anime_name, best_links)
         return {"status": "success", "message": f"Pushed {len(best_links)} links to JDownloader."}
     except ValueError as ve:

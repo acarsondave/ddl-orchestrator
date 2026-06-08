@@ -238,6 +238,8 @@ function openModal(title) {
     modalAnimeName.textContent = title;
     providerUrlInput.value = "";
     modalStatus.className = "status-text hidden";
+    const dryRunResults = document.getElementById("dry-run-results");
+    if (dryRunResults) dryRunResults.classList.add("hidden");
     requestModal.classList.remove("hidden");
 }
 
@@ -245,9 +247,74 @@ cancelModal.addEventListener("click", () => {
     requestModal.classList.add("hidden");
 });
 
+const testExtractionBtn = document.getElementById("test-extraction");
+const dryRunResults = document.getElementById("dry-run-results");
+const dryRunList = document.getElementById("dry-run-list");
+
+testExtractionBtn.addEventListener("click", async () => {
+    const url = providerUrlInput.value.trim();
+    const pid = providerSelect.value;
+    const mediaType = document.getElementById("media-type-select").value;
+    
+    if (!url || !url.startsWith("http")) {
+        showModalStatus("Please enter a valid URL.", "error");
+        return;
+    }
+    if (!pid) {
+        showModalStatus("Please select a provider.", "error");
+        return;
+    }
+
+    showModalStatus("", "");
+    testExtractionBtn.textContent = "Testing...";
+    testExtractionBtn.disabled = true;
+    submitRequest.disabled = true;
+
+    try {
+        const res = await apiFetch("/request", {
+            method: "POST",
+            body: JSON.stringify({
+                provider_id: pid,
+                anime_name: selectedAnime,
+                anime_url: url,
+                media_type: mediaType,
+                dry_run: true
+            })
+        });
+        
+        dryRunList.innerHTML = "";
+        if (res.links && res.links.length > 0) {
+            res.links.forEach(link => {
+                const li = document.createElement("li");
+                // Decode URI component to make filenames readable in the dry run
+                try {
+                    li.textContent = decodeURIComponent(link.split('/').pop() || link);
+                } catch (e) {
+                    li.textContent = link.split('/').pop() || link;
+                }
+                li.style.marginBottom = "4px";
+                dryRunList.appendChild(li);
+            });
+            dryRunResults.classList.remove("hidden");
+            showModalStatus(`Dry run complete: Found ${res.links.length} links.`, "success");
+        } else {
+            dryRunResults.classList.add("hidden");
+            showModalStatus("Dry run complete: No valid links found.", "error");
+        }
+    } catch (e) {
+        showModalStatus(e.message, "error");
+        dryRunResults.classList.add("hidden");
+    } finally {
+        testExtractionBtn.textContent = "Dry Run";
+        testExtractionBtn.disabled = false;
+        submitRequest.disabled = false;
+    }
+});
+
 submitRequest.addEventListener("click", async () => {
     const url = providerUrlInput.value.trim();
     const pid = providerSelect.value;
+    const mediaType = document.getElementById("media-type-select").value;
     
     if (!url || !url.startsWith("http")) {
         showModalStatus("Please enter a valid URL.", "error");
@@ -260,6 +327,7 @@ submitRequest.addEventListener("click", async () => {
 
     showModalStatus("", "");
     setBtnState(submitRequest, submitText, submitSpinner, true, "Scraping...");
+    testExtractionBtn.disabled = true;
 
     try {
         const res = await apiFetch("/request", {
@@ -267,7 +335,9 @@ submitRequest.addEventListener("click", async () => {
             body: JSON.stringify({
                 provider_id: pid,
                 anime_name: selectedAnime,
-                anime_url: url
+                anime_url: url,
+                media_type: mediaType,
+                dry_run: false
             })
         });
         showModalStatus(res.message || "Successfully sent to JDownloader!", "success");
@@ -279,6 +349,7 @@ submitRequest.addEventListener("click", async () => {
         showModalStatus(e.message, "error");
     } finally {
         setBtnState(submitRequest, submitText, submitSpinner, false, "Send to JDownloader");
+        testExtractionBtn.disabled = false;
     }
 });
 
