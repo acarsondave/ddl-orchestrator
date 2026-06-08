@@ -1,4 +1,4 @@
-app = "tokyoinsider-orchestrator"
+app = "acarson-ddl-orchestrator"
 primary_region = "iad"
 
 [build]
