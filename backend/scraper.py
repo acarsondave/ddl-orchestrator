@@ -10,7 +10,7 @@ class Provider:
     def health_check(self) -> bool:
         raise NotImplementedError
 
-    def get_episodes(self, anime_url: str) -> list[str]:
+    def get_episodes(self, anime_url: str, anime_name: str = "") -> list[str]:
         raise NotImplementedError
 
     def get_links(self, episode_url: str) -> list[str]:
@@ -35,7 +35,7 @@ class TokyoInsiderProvider(Provider):
         html = self.fetch_html("https://www.tokyoinsider.com")
         return bool(html and "Tokyo Insider" in html)
 
-    def get_episodes(self, anime_url: str) -> list[str]:
+    def get_episodes(self, anime_url: str, anime_name: str = "") -> list[str]:
         html = self.fetch_html(anime_url)
         if not html: return []
         
@@ -76,24 +76,50 @@ class Universal111477Provider(Provider):
         html = self.fetch_html("https://a.111477.xyz/")
         return "Index of" in html or bool(html)
 
-    def get_episodes(self, anime_url: str) -> list[str]:
+    def get_episodes(self, anime_url: str, anime_name: str = "") -> list[str]:
         html = self.fetch_html(anime_url)
         if not html: return []
         
         matches = re.findall(r'data-name="([^"]+)".*?data-url="([^"]+)"', html)
         
-        ep_urls = []
+        all_links = []
         for name, url_path in matches:
             name_lower = name.lower()
             if name_lower.endswith('.mkv') or name_lower.endswith('.mp4'):
-                # Ensure the url_path is absolute or join it properly
                 full_url = urljoin("https://a.111477.xyz", url_path)
-                ep_urls.append(full_url)
+                all_links.append((name, full_url))
                 
-        return ep_urls
+        is_tv = "[TV]" in anime_name or "Season" in anime_url or "Episode" in anime_url
+        is_movie = "[MOVIE]" in anime_name
+        
+        if is_movie and not is_tv:
+            best = self._pick_best(all_links)
+            return [best] if best else []
+        else:
+            groups = {}
+            for name, full_url in all_links:
+                ep_match = re.search(r'(?:S\d+E|E|Ep\s*|Episode\s*|-\s*)(\d{1,4})', name, re.IGNORECASE)
+                if ep_match:
+                    ep_num = int(ep_match.group(1))
+                    if ep_num not in groups:
+                        groups[ep_num] = []
+                    groups[ep_num].append((name, full_url))
+                else:
+                    if "misc" not in groups: groups["misc"] = []
+                    groups["misc"].append((name, full_url))
+            
+            final_links = []
+            for ep, eps_list in groups.items():
+                best = self._pick_best(eps_list)
+                if best: final_links.append(best)
+            return final_links
+
+    def _pick_best(self, links_tuples):
+        if not links_tuples: return None
+        sorted_links = sorted(links_tuples, key=lambda x: score_link(x[0]), reverse=True)
+        return sorted_links[0][1]
 
     def get_links(self, episode_url: str) -> list[str]:
-        # For this provider, the episode_url is already the direct download link
         return [episode_url]
 
 class ProviderRegistry:
@@ -117,17 +143,20 @@ def score_link(link: str) -> int:
     score = 0
     link_lower = link.lower()
     
+    if any(k in link_lower for k in ['2160p', '4k', 'uhd']):
+        score += 2000
+    elif '1080p' in link_lower:
+        score += 1000
+    elif '720p' in link_lower:
+        score += 500
+        
     if any(k in link_lower for k in ['h264', 'x264', 'avc']):
-        score += 50
-        
-    if re.search(r's\d+e\d+', link_lower):
-        score += 50
-        
+        score += 200
     if any(k in link_lower for k in ['hevc', 'x265', 'h265']):
         score -= 100
         
     if ".mkv" in link_lower:
-        score += 5
+        score += 50
         
     return score
 
@@ -135,12 +164,12 @@ def get_best_link(links: list[str]) -> str | None:
     if not links: return None
     return sorted(links, key=score_link, reverse=True)[0]
 
-def scrape_best_links(provider_id: str, anime_url: str, max_workers: int = 5) -> list[str]:
+def scrape_best_links(provider_id: str, anime_url: str, anime_name: str = "", max_workers: int = 5) -> list[str]:
     provider = registry.get(provider_id)
     if not provider:
         raise ValueError("Invalid provider ID")
 
-    episodes = provider.get_episodes(anime_url)
+    episodes = provider.get_episodes(anime_url, anime_name)
     best_links = []
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:

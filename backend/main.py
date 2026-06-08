@@ -47,18 +47,65 @@ def list_providers(_=Depends(verify_token)):
         })
     return providers
 
+import urllib.request
+import urllib.parse
+import re
+import asyncio
+
+def search_tmdb(query: str):
+    url = f"https://www.themoviedb.org/search?query={urllib.parse.quote(query)}"
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'})
+    try:
+        html = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
+    except Exception:
+        return []
+
+    results = []
+    cards_html = re.findall(r'class="comp:media-card(.*?)</p></div></div></div></div>', html, re.DOTALL)
+    
+    for card_html in cards_html:
+        media_type = re.search(r'data-media-type="([^"]+)"', card_html)
+        title = re.search(r'<h2[^>]*><span>([^<]+)</span></h2>', card_html)
+        date = re.search(r'<span class="release_date[^>]*>([^<]+)</span>', card_html)
+        img = re.search(r'src="(https://media\.themoviedb\.org/t/p/[^"]+)"', card_html)
+        
+        if not media_type or not title: continue
+        mt = media_type.group(1)
+        if mt not in ["movie", "tv"]: continue
+        
+        t = title.group(1).replace('&#39;', "'")
+        d = date.group(1).split(',')[-1].strip() if date else ""
+        i = img.group(1) if img else f"https://via.placeholder.com/200x300/121212/ffffff?text={urllib.parse.quote(t)}"
+        
+        results.append({
+            "title": f"[{mt.upper()}] {t}",
+            "year": d,
+            "images": {"jpg": {"image_url": i}}
+        })
+    return results
+
 @app.get("/api/search")
 async def search_anime(q: str, _=Depends(verify_token)):
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(f"https://api.jikan.moe/v4/anime?q={q}&limit=5")
-        if resp.status_code != 200:
-            raise HTTPException(status_code=500, detail="Search provider failed")
-        return resp.json()
+    tmdb_results = await asyncio.to_thread(search_tmdb, q)
+    
+    jikan_results = []
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"https://api.jikan.moe/v4/anime?q={q}&limit=5", timeout=5.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                for item in data.get("data", []):
+                    item["title"] = f"[ANIME] {item['title']}"
+                    jikan_results.append(item)
+    except Exception:
+        pass
+        
+    return {"data": tmdb_results[:8] + jikan_results[:5]}
 
 @app.post("/api/request")
 def request_anime(payload: RequestAnimePayload, _=Depends(verify_token)):
     try:
-        best_links = scrape_best_links(payload.provider_id, str(payload.anime_url))
+        best_links = scrape_best_links(payload.provider_id, str(payload.anime_url), payload.anime_name)
         if not best_links:
             raise HTTPException(status_code=404, detail="No valid download links found.")
         
