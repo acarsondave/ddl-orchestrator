@@ -323,7 +323,10 @@ async function loadTasks() {
 }
 
 async function renderTasks(data) {
-    const packages = [...data.linkgrabber, ...data.downloads];
+    const grabberPackages = (data.linkgrabber || []).map(p => ({ ...p, isLinkgrabber: true }));
+    const downloadPackages = (data.downloads || []).map(p => ({ ...p, isLinkgrabber: false }));
+    const packages = [...grabberPackages, ...downloadPackages];
+    
     if (packages.length === 0) {
         tasksGrid.innerHTML = `<p class="text-muted">No active or recent tasks found.</p>`;
         return;
@@ -337,23 +340,28 @@ async function renderTasks(data) {
         const loaded = pkg.bytesLoaded || 0;
         const percent = total > 0 ? ((loaded / total) * 100).toFixed(1) : 0;
         
-        let statusText = pkg.status || "Downloading";
+        let statusText = pkg.status;
         let statusClass = "status-downloading";
         
         if (pkg.finished) {
-            statusText = "Finished";
+            statusText = statusText || "Finished";
             statusClass = "status-finished";
-        } else if (total === 0 || pkg.status === "Extracting") {
+        } else if (pkg.isLinkgrabber) {
+            statusText = statusText || "Pending Analysis";
             statusClass = "status-extracting";
+        } else if (total === 0 || pkg.status === "Extracting") {
+            statusText = statusText || "Starting...";
+            statusClass = "status-extracting";
+        } else {
+            statusText = statusText || "Downloading";
         }
 
-        const sizeMB = (total / 1048576).toFixed(1);
-        const childCount = pkg.childCount || 1;
+        const sizeMB = total > 0 ? (total / 1048576).toFixed(1) + " MB" : "Unknown Size";
+        const childCount = pkg.childCount !== undefined ? pkg.childCount : "Various";
 
         // Fetch image logic
         if (!imageCache[title]) {
             try {
-                // Background cache fetch
                 const sd = await apiFetch(`/search?q=${encodeURIComponent(title)}`);
                 if (sd.data && sd.data.length > 0) {
                     imageCache[title] = sd.data[0].images.jpg.image_url;
@@ -374,10 +382,10 @@ async function renderTasks(data) {
             <div class="task-details">
                 <div class="task-title" title="${title}">${title}</div>
                 <div class="task-meta">
-                    ${childCount} file(s) • ${sizeMB} MB
+                    ${childCount} file(s) • ${sizeMB}
                 </div>
                 <div class="task-status ${statusClass}">${statusText}</div>
-                ${!pkg.finished ? `
+                ${!pkg.finished && !pkg.isLinkgrabber && total > 0 ? `
                     <div class="progress-container">
                         <div class="progress-bar" style="width: ${percent}%"></div>
                     </div>
