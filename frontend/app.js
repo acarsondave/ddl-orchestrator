@@ -4,9 +4,11 @@ const authScreen = document.getElementById("auth-screen");
 const appScreen = document.getElementById("app-screen");
 const authForm = document.getElementById("auth-form");
 const apiKeyInput = document.getElementById("api-key");
-const authError = document.getElementById("auth-error");
+const authStatus = document.getElementById("auth-status");
 const logoutBtn = document.getElementById("logout-btn");
 const unlockBtn = document.getElementById("unlock-btn");
+const unlockText = document.getElementById("unlock-text");
+const unlockSpinner = document.getElementById("unlock-spinner");
 
 const searchInput = document.getElementById("search-input");
 const searchBtn = document.getElementById("search-btn");
@@ -16,6 +18,8 @@ const loading = document.getElementById("loading");
 const requestModal = document.getElementById("request-modal");
 const cancelModal = document.getElementById("cancel-modal");
 const submitRequest = document.getElementById("submit-request");
+const submitText = document.getElementById("submit-text");
+const submitSpinner = document.getElementById("submit-spinner");
 const providerUrlInput = document.getElementById("provider-url");
 const providerSelect = document.getElementById("provider-select");
 const modalAnimeName = document.getElementById("modal-anime-name");
@@ -25,7 +29,6 @@ let token = localStorage.getItem("orchestrator_token");
 let selectedAnime = null;
 let providersLoaded = false;
 
-// Initial auth check
 if (token) {
     verifyAndLoadApp();
 }
@@ -45,9 +48,8 @@ authForm.addEventListener("submit", async (e) => {
     if (!key) return;
 
     token = key;
-    unlockBtn.disabled = true;
-    unlockBtn.textContent = "Verifying...";
-    authError.classList.add("hidden");
+    setBtnState(unlockBtn, unlockText, unlockSpinner, true, "Waking server...");
+    authStatus.classList.add("hidden");
 
     try {
         await loadProviders();
@@ -55,11 +57,9 @@ authForm.addEventListener("submit", async (e) => {
         showApp();
     } catch (e) {
         token = null;
-        authError.textContent = "Invalid access key.";
-        authError.classList.remove("hidden");
+        showAuthStatus(e.message === "Unauthorized" ? "Invalid access key." : `Error: ${e.message}`, "error");
     } finally {
-        unlockBtn.disabled = false;
-        unlockBtn.textContent = "Unlock";
+        setBtnState(unlockBtn, unlockText, unlockSpinner, false, "Unlock");
     }
 });
 
@@ -80,7 +80,23 @@ function showApp() {
     authScreen.classList.remove("active");
     appScreen.classList.remove("hidden");
     appScreen.classList.add("active");
-    authError.classList.add("hidden");
+    authStatus.classList.add("hidden");
+}
+
+function showAuthStatus(msg, type) {
+    authStatus.textContent = msg;
+    authStatus.className = `status-text ${type === "error" ? "error-text" : "success-text"}`;
+    authStatus.classList.remove("hidden");
+}
+
+function setBtnState(btn, textEl, spinnerEl, isLoading, text) {
+    btn.disabled = isLoading;
+    textEl.textContent = text;
+    if (isLoading) {
+        spinnerEl.classList.remove("hidden");
+    } else {
+        spinnerEl.classList.add("hidden");
+    }
 }
 
 async function apiFetch(endpoint, options = {}) {
@@ -114,7 +130,7 @@ async function loadProviders() {
     providers.forEach(p => {
         const opt = document.createElement("option");
         opt.value = p.id;
-        opt.textContent = `${p.name} ${p.healthy ? '(🟢 Active)' : '(🔴 Down)'}`;
+        opt.textContent = `${p.name} ${p.healthy ? '(Active)' : '(Down)'}`;
         if (!p.healthy) opt.disabled = true;
         else hasHealthy = true;
         providerSelect.appendChild(opt);
@@ -136,7 +152,7 @@ searchBtn.addEventListener("click", async () => {
         renderResults(data.data || []);
     } catch (e) {
         if (e.message !== "Unauthorized") {
-            resultsGrid.innerHTML = `<p class="error-text">Failed to fetch results: ${e.message}</p>`;
+            resultsGrid.innerHTML = `<p class="error-text" style="text-align: center; width: 100%;">Failed to fetch results: ${e.message}</p>`;
         }
     } finally {
         loading.classList.add("hidden");
@@ -145,22 +161,22 @@ searchBtn.addEventListener("click", async () => {
 
 function renderResults(animeList) {
     if (animeList.length === 0) {
-        resultsGrid.innerHTML = `<p style="color:var(--text-muted)">No results found.</p>`;
+        resultsGrid.innerHTML = `<p style="color:var(--text-muted); text-align: center; width: 100%;">No results found.</p>`;
         return;
     }
 
     animeList.forEach(anime => {
         const card = document.createElement("div");
-        card.className = "anime-card glass-card";
+        card.className = "anime-card";
         
         const img = anime.images.jpg.image_url;
         const title = anime.title;
-        const year = anime.year || "Unknown";
+        const year = anime.year || "N/A";
 
         card.innerHTML = `
             <img src="${img}" alt="${title}">
             <div class="anime-info">
-                <div class="anime-title">${title}</div>
+                <div class="anime-title" title="${title}">${title}</div>
                 <div class="anime-year">${year}</div>
             </div>
         `;
@@ -187,16 +203,16 @@ submitRequest.addEventListener("click", async () => {
     const pid = providerSelect.value;
     
     if (!url || !url.startsWith("http")) {
-        showStatus("Please enter a valid URL.", "error");
+        showModalStatus("Please enter a valid URL.", "error");
         return;
     }
     if (!pid) {
-        showStatus("Please select a provider.", "error");
+        showModalStatus("Please select a provider.", "error");
         return;
     }
 
-    showStatus("Sending to Orchestrator (Scraping)...", "");
-    submitRequest.disabled = true;
+    showModalStatus("", "");
+    setBtnState(submitRequest, submitText, submitSpinner, true, "Scraping...");
 
     try {
         const res = await apiFetch("/request", {
@@ -207,17 +223,21 @@ submitRequest.addEventListener("click", async () => {
                 anime_url: url
             })
         });
-        showStatus(res.message || "Successfully sent to JDownloader!", "success");
+        showModalStatus(res.message || "Successfully sent to JDownloader!", "success");
         setTimeout(() => requestModal.classList.add("hidden"), 3000);
     } catch (e) {
-        showStatus(e.message, "error");
+        showModalStatus(e.message, "error");
     } finally {
-        submitRequest.disabled = false;
+        setBtnState(submitRequest, submitText, submitSpinner, false, "Send to JDownloader");
     }
 });
 
-function showStatus(msg, type) {
+function showModalStatus(msg, type) {
+    if (!msg) {
+        modalStatus.classList.add("hidden");
+        return;
+    }
     modalStatus.textContent = msg;
-    modalStatus.className = `status-text ${type === "error" ? "error-text" : type === "success" ? "success-text" : ""}`;
+    modalStatus.className = `status-text ${type === "error" ? "error-text" : "success-text"}`;
     modalStatus.classList.remove("hidden");
 }
