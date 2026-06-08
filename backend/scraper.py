@@ -147,7 +147,8 @@ class Universal111477Provider(Provider):
                 if html:
                     matches = re.findall(r'data-name="([^"]+)".*?data-url="([^"]+)"', html)
                     for name, url_path in matches:
-                        if "." not in name and name.lower() not in ["asiandrama", "kdrama", "misc", "movies", "tvs"]:
+                        # Ignore system folders and hidden .parts files
+                        if name.lower() not in ["asiandrama", "kdrama", "misc", "movies", "tvs"] and not name.startswith('.'):
                             all_matches.append((name, url_path, d.strip('/')))
 
         results = []
@@ -155,14 +156,14 @@ class Universal111477Provider(Provider):
         query_words = set(re.findall(r'\w+', query_lower))
         
         for name, url_path, category in all_matches:
-            name_lower = name.lower()
-            ratio = SequenceMatcher(None, query_lower, name_lower).ratio()
+            name_clean = name.replace(".", " ").replace("_", " ").lower()
+            ratio = SequenceMatcher(None, query_lower, name_clean).ratio()
             
-            name_words = set(re.findall(r'\w+', name_lower))
+            name_words = set(re.findall(r'\w+', name_clean))
             if query_words.issubset(name_words):
                 ratio += 1.0
                 
-            if ratio > 0.4 or query_lower in name_lower:
+            if ratio > 0.4 or query_lower in name_clean:
                 results.append({
                     "title": f"{name} [{category}]",
                     "url": "https://a.111477.xyz" + url_path,
@@ -186,7 +187,7 @@ class Universal111477Provider(Provider):
             if name_lower.endswith('.mkv') or name_lower.endswith('.mp4'):
                 full_url = urljoin("https://a.111477.xyz", url_path)
                 all_links.append((name, full_url))
-            elif "." not in name and name_lower not in ["asiandrama", "kdrama", "misc", "movies", "tvs"]:
+            elif url_path.endswith('/') and name_lower not in ["asiandrama", "kdrama", "misc", "movies", "tvs"]:
                 full_url = urljoin("https://a.111477.xyz", url_path)
                 directories_to_crawl.append(full_url)
                 
