@@ -293,11 +293,53 @@ function showModalStatus(msg, type) {
 }
 
 // ------------------------------------
+// Idle & Visibility Detection (Scale-to-zero optimization)
+// ------------------------------------
+let inactivityTimer;
+let isIdle = false;
+const INACTIVITY_LIMIT = 60000; // 1 minute
+
+function resetInactivity() {
+    isIdle = false;
+    clearTimeout(inactivityTimer);
+    inactivityTimer = setTimeout(() => {
+        isIdle = true;
+        stopPollingTasks();
+    }, INACTIVITY_LIMIT);
+
+    // If we are on the tasks tab and it was paused, resume it
+    if (navTasks.classList.contains("active") && document.visibilityState === "visible") {
+        if (!tasksPollingInterval) {
+            startPollingTasks();
+        }
+    }
+}
+
+// Track user activity
+['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evt => 
+    window.addEventListener(evt, resetInactivity, { passive: true })
+);
+
+// Track tab visibility
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+        stopPollingTasks();
+    } else {
+        resetInactivity();
+    }
+});
+
+resetInactivity();
+
+// ------------------------------------
 // Tasks View
 // ------------------------------------
 function startPollingTasks() {
+    if (isIdle || document.visibilityState === "hidden") return;
     loadTasks();
-    tasksPollingInterval = setInterval(loadTasks, 5000);
+    if (!tasksPollingInterval) {
+        tasksPollingInterval = setInterval(loadTasks, 5000);
+    }
 }
 
 function stopPollingTasks() {
@@ -308,6 +350,11 @@ function stopPollingTasks() {
 }
 
 async function loadTasks() {
+    if (isIdle || document.visibilityState === "hidden") {
+        stopPollingTasks();
+        return;
+    }
+
     if (tasksGrid.innerHTML === "") tasksLoading.classList.remove("hidden");
 
     try {
