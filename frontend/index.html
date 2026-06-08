@@ -36,24 +36,46 @@
                     <img src="https://watch.minirecc.com/web/favicon.bc8d51405ec040305a87.ico" alt="Logo" class="header-logo">
                     <h1>Acarson DDL Orchestrator</h1>
                 </div>
+                <nav class="header-nav">
+                    <button id="nav-search" class="nav-link active">Search</button>
+                    <button id="nav-tasks" class="nav-link">Tasks</button>
+                </nav>
                 <button id="logout-btn" class="btn-secondary">Lock Session</button>
             </div>
         </header>
 
         <main class="container">
-            <div class="search-section">
-                <div class="search-bar">
-                    <input type="text" id="search-input" placeholder="Search anime on Jikan...">
-                    <button id="search-btn" class="btn-primary">Search</button>
+            <!-- Search View -->
+            <div id="view-search" class="view active">
+                <div class="search-section">
+                    <div class="search-bar">
+                        <input type="text" id="search-input" placeholder="Search anime on Jikan...">
+                        <button id="search-btn" class="btn-primary">Search</button>
+                    </div>
                 </div>
+
+                <div id="loading" class="hidden">
+                    <div class="spinner"></div>
+                    <p class="loading-text">Waking up server and fetching results...</p>
+                </div>
+
+                <div id="results-grid" class="grid"></div>
             </div>
 
-            <div id="loading" class="hidden">
-                <div class="spinner"></div>
-                <p class="loading-text">Waking up server and fetching results...</p>
+            <!-- Tasks View -->
+            <div id="view-tasks" class="view hidden">
+                <div class="tasks-header">
+                    <h2>Active & Recent Downloads</h2>
+                    <p class="text-muted">Real-time status from JDownloader.</p>
+                </div>
+                
+                <div id="tasks-loading" class="hidden">
+                    <div class="spinner"></div>
+                    <p class="loading-text">Fetching tasks from JDownloader...</p>
+                </div>
+                
+                <div id="tasks-grid" class="tasks-grid"></div>
             </div>
-
-            <div id="results-grid" class="grid"></div>
         </main>
     </div>
 

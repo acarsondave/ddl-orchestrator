@@ -10,11 +10,23 @@ const unlockBtn = document.getElementById("unlock-btn");
 const unlockText = document.getElementById("unlock-text");
 const unlockSpinner = document.getElementById("unlock-spinner");
 
+// Navigation
+const navSearch = document.getElementById("nav-search");
+const navTasks = document.getElementById("nav-tasks");
+const viewSearch = document.getElementById("view-search");
+const viewTasks = document.getElementById("view-tasks");
+
+// Search View
 const searchInput = document.getElementById("search-input");
 const searchBtn = document.getElementById("search-btn");
 const resultsGrid = document.getElementById("results-grid");
 const loading = document.getElementById("loading");
 
+// Tasks View
+const tasksGrid = document.getElementById("tasks-grid");
+const tasksLoading = document.getElementById("tasks-loading");
+
+// Modal
 const requestModal = document.getElementById("request-modal");
 const cancelModal = document.getElementById("cancel-modal");
 const submitRequest = document.getElementById("submit-request");
@@ -28,6 +40,10 @@ const modalStatus = document.getElementById("modal-status");
 let token = localStorage.getItem("orchestrator_token");
 let selectedAnime = null;
 let providersLoaded = false;
+let tasksPollingInterval = null;
+
+// Image Cache: LocalStorage acts as our DB to avoid spamming Jikan
+const imageCache = JSON.parse(localStorage.getItem("anime_images") || "{}");
 
 if (token) {
     verifyAndLoadApp();
@@ -67,6 +83,7 @@ logoutBtn.addEventListener("click", forceLogout);
 
 function forceLogout() {
     token = null;
+    stopPollingTasks();
     localStorage.removeItem("orchestrator_token");
     authScreen.classList.remove("hidden");
     authScreen.classList.add("active");
@@ -140,6 +157,32 @@ async function loadProviders() {
     providersLoaded = true;
 }
 
+// ------------------------------------
+// Tab Navigation
+// ------------------------------------
+navSearch.addEventListener("click", () => {
+    navSearch.classList.add("active");
+    navTasks.classList.remove("active");
+    viewSearch.classList.add("active");
+    viewSearch.classList.remove("hidden");
+    viewTasks.classList.remove("active");
+    viewTasks.classList.add("hidden");
+    stopPollingTasks();
+});
+
+navTasks.addEventListener("click", () => {
+    navTasks.classList.add("active");
+    navSearch.classList.remove("active");
+    viewTasks.classList.add("active");
+    viewTasks.classList.remove("hidden");
+    viewSearch.classList.remove("active");
+    viewSearch.classList.add("hidden");
+    startPollingTasks();
+});
+
+// ------------------------------------
+// Search View
+// ------------------------------------
 searchBtn.addEventListener("click", async () => {
     const q = searchInput.value.trim();
     if (!q) return;
@@ -172,6 +215,10 @@ function renderResults(animeList) {
         const img = anime.images.jpg.image_url;
         const title = anime.title;
         const year = anime.year || "N/A";
+
+        // Cache image immediately for tasks view later
+        imageCache[title] = img;
+        localStorage.setItem("anime_images", JSON.stringify(imageCache));
 
         card.innerHTML = `
             <img src="${img}" alt="${title}">
@@ -224,7 +271,10 @@ submitRequest.addEventListener("click", async () => {
             })
         });
         showModalStatus(res.message || "Successfully sent to JDownloader!", "success");
-        setTimeout(() => requestModal.classList.add("hidden"), 3000);
+        setTimeout(() => {
+            requestModal.classList.add("hidden");
+            navTasks.click(); // Auto-switch to tasks
+        }, 2000);
     } catch (e) {
         showModalStatus(e.message, "error");
     } finally {
@@ -240,4 +290,100 @@ function showModalStatus(msg, type) {
     modalStatus.textContent = msg;
     modalStatus.className = `status-text ${type === "error" ? "error-text" : "success-text"}`;
     modalStatus.classList.remove("hidden");
+}
+
+// ------------------------------------
+// Tasks View
+// ------------------------------------
+function startPollingTasks() {
+    loadTasks();
+    tasksPollingInterval = setInterval(loadTasks, 5000);
+}
+
+function stopPollingTasks() {
+    if (tasksPollingInterval) {
+        clearInterval(tasksPollingInterval);
+        tasksPollingInterval = null;
+    }
+}
+
+async function loadTasks() {
+    if (tasksGrid.innerHTML === "") tasksLoading.classList.remove("hidden");
+
+    try {
+        const data = await apiFetch("/downloads");
+        renderTasks(data);
+    } catch (e) {
+        if (e.message !== "Unauthorized") {
+            tasksGrid.innerHTML = `<p class="error-text">Failed to sync with JDownloader.</p>`;
+        }
+    } finally {
+        tasksLoading.classList.add("hidden");
+    }
+}
+
+async function renderTasks(data) {
+    const packages = [...data.linkgrabber, ...data.downloads];
+    if (packages.length === 0) {
+        tasksGrid.innerHTML = `<p class="text-muted">No active or recent tasks found.</p>`;
+        return;
+    }
+
+    tasksGrid.innerHTML = "";
+
+    for (const pkg of packages) {
+        const title = pkg.name;
+        const total = pkg.bytesTotal || 0;
+        const loaded = pkg.bytesLoaded || 0;
+        const percent = total > 0 ? ((loaded / total) * 100).toFixed(1) : 0;
+        
+        let statusText = pkg.status || "Downloading";
+        let statusClass = "status-downloading";
+        
+        if (pkg.finished) {
+            statusText = "Finished";
+            statusClass = "status-finished";
+        } else if (total === 0 || pkg.status === "Extracting") {
+            statusClass = "status-extracting";
+        }
+
+        const sizeMB = (total / 1048576).toFixed(1);
+        const childCount = pkg.childCount || 1;
+
+        // Fetch image logic
+        if (!imageCache[title]) {
+            try {
+                // Background cache fetch
+                const sd = await apiFetch(`/search?q=${encodeURIComponent(title)}`);
+                if (sd.data && sd.data.length > 0) {
+                    imageCache[title] = sd.data[0].images.jpg.image_url;
+                    localStorage.setItem("anime_images", JSON.stringify(imageCache));
+                } else {
+                    imageCache[title] = "https://via.placeholder.com/60x80/222222/888888?text=N/A";
+                }
+            } catch (e) {
+                imageCache[title] = "https://via.placeholder.com/60x80/222222/888888?text=N/A";
+            }
+        }
+        const imgSrc = imageCache[title];
+
+        const card = document.createElement("div");
+        card.className = "task-card";
+        card.innerHTML = `
+            <img src="${imgSrc}" alt="${title}" class="task-img">
+            <div class="task-details">
+                <div class="task-title" title="${title}">${title}</div>
+                <div class="task-meta">
+                    ${childCount} file(s) • ${sizeMB} MB
+                </div>
+                <div class="task-status ${statusClass}">${statusText}</div>
+                ${!pkg.finished ? `
+                    <div class="progress-container">
+                        <div class="progress-bar" style="width: ${percent}%"></div>
+                    </div>
+                ` : ""}
+            </div>
+        `;
+        tasksGrid.appendChild(card);
+    }
 }

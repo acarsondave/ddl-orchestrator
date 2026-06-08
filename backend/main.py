@@ -68,3 +68,11 @@ def request_anime(payload: RequestAnimePayload, _=Depends(verify_token)):
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/downloads")
+def get_downloads(_=Depends(verify_token)):
+    try:
+        from jdownloader import get_downloads_status
+        return get_downloads_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

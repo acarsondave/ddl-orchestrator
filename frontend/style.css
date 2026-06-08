@@ -48,6 +48,20 @@ body {
     opacity: 1;
 }
 
+.view {
+    display: none;
+    animation: fadeIn 0.3s ease;
+}
+
+.view.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* Authentication */
 #auth-screen {
     justify-content: center;
@@ -186,7 +200,11 @@ button {
     color: var(--success-color);
 }
 
-/* App Header */
+.text-muted {
+    color: var(--text-muted);
+}
+
+/* App Header & Nav */
 .app-header {
     border-bottom: 1px solid var(--surface-border);
     padding: 16px 0;
@@ -223,6 +241,32 @@ button {
     font-weight: 500;
 }
 
+.header-nav {
+    display: flex;
+    gap: 8px;
+    background: var(--surface-color);
+    padding: 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--surface-border);
+}
+
+.nav-link {
+    background: transparent;
+    color: var(--text-muted);
+    padding: 6px 16px;
+    border-radius: var(--radius-sm);
+    transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+    color: var(--text-primary);
+}
+
+.nav-link.active {
+    background: var(--surface-border);
+    color: var(--text-primary);
+}
+
 /* Main Container */
 .container {
     max-width: 1100px;
@@ -231,6 +275,7 @@ button {
     width: 100%;
 }
 
+/* Search Section */
 .search-section {
     margin-bottom: 48px;
 }
@@ -251,7 +296,7 @@ button {
     padding: 12px 24px;
 }
 
-/* Results Grid */
+/* Grids */
 .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -296,6 +341,90 @@ button {
 .anime-year {
     font-size: 0.8rem;
     color: var(--text-muted);
+}
+
+/* Tasks View */
+.tasks-header {
+    margin-bottom: 32px;
+}
+
+.tasks-header h2 {
+    font-size: 1.5rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.tasks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+.task-card {
+    background: var(--surface-color);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.task-img {
+    width: 60px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    background: var(--surface-border);
+    flex-shrink: 0;
+}
+
+.task-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.task-title {
+    font-weight: 500;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.task-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.task-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: var(--surface-border);
+}
+
+.status-extracting { color: #f5a623; background: rgba(245, 166, 35, 0.1); }
+.status-downloading { color: #00e5ff; background: rgba(0, 229, 255, 0.1); }
+.status-finished { color: var(--success-color); background: rgba(48, 164, 108, 0.1); }
+
+.progress-container {
+    height: 6px;
+    background: var(--surface-border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--primary-color);
+    width: 0%;
+    transition: width 0.3s ease;
 }
 
 /* Spinners */

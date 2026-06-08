@@ -1,7 +1,7 @@
 import myjdapi
 import os
 
-def push_to_jdownloader(anime_name: str, links: list[str]):
+def _get_jd_client():
     email = os.environ.get("JD_EMAIL")
     password = os.environ.get("JD_PASSWORD")
     device_name = os.environ.get("JD_DEVICE_NAME")
@@ -19,5 +19,38 @@ def push_to_jdownloader(anime_name: str, links: list[str]):
     if not device:
         raise Exception(f"Device '{device_name}' not found.")
         
-    device.linkgrabber.add_links([{"autostart": True, "links": ",".join(links), "packageName": anime_name}])
+    return device
+
+def push_to_jdownloader(anime_name: str, links: list[str]):
+    device = _get_jd_client()
+    device.linkgrabber.add_links([{"autostart": True, "links": "\n".join(links), "packageName": anime_name}])
     return True
+
+def get_downloads_status():
+    device = _get_jd_client()
+    
+    try:
+        grabber_packages = device.linkgrabber.query_packages([{
+            "bytesLoaded": True,
+            "bytesTotal": True,
+            "status": True,
+            "childCount": True
+        }]) or []
+    except Exception:
+        grabber_packages = []
+        
+    try:
+        downloads_packages = device.downloads.query_packages([{
+            "bytesLoaded": True,
+            "bytesTotal": True,
+            "status": True,
+            "finished": True,
+            "childCount": True
+        }]) or []
+    except Exception:
+        downloads_packages = []
+        
+    return {
+        "linkgrabber": grabber_packages,
+        "downloads": downloads_packages
+    }
