@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acarson DDL Orchestrator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="auth-screen" class="screen active">
+        <div class="glass-card auth-card">
+            <h1>Orchestrator</h1>
+            <p>Enter your access key to continue.</p>
+            <form id="auth-form">
+                <input type="password" id="api-key" placeholder="Access Key" required>
+                <button type="submit" class="btn-primary">Unlock</button>
+            </form>
+            <div id="auth-error" class="error-text hidden">Invalid key. Please try again.</div>
+        </div>
+    </div>
+
+    <div id="app-screen" class="screen hidden">
+        <header class="glass-header">
+            <div class="header-content">
+                <h1>Acarson DDL Orchestrator</h1>
+                <button id="logout-btn" class="btn-secondary">Lock</button>
+            </div>
+        </header>
+
+        <main class="container">
+            <div class="search-section">
+                <div class="search-bar glass-card">
+                    <input type="text" id="search-input" placeholder="Search anime on Jikan...">
+                    <button id="search-btn" class="btn-primary">Search</button>
+                </div>
+            </div>
+
+            <div id="loading" class="hidden">
+                <div class="spinner"></div>
+            </div>
+
+            <div id="results-grid" class="grid"></div>
+        </main>
+    </div>
+
+    <div id="request-modal" class="modal hidden">
+        <div class="modal-content glass-card">
+            <h2 id="modal-title">Request Anime</h2>
+            <p>Select provider and enter the exact URL for <strong id="modal-anime-name"></strong>.</p>
+            
+            <select id="provider-select" class="provider-select">
+                <option value="">Loading providers...</option>
+            </select>
+            
+            <input type="url" id="provider-url" placeholder="Enter provider URL...">
+            
+            <div class="modal-actions">
+                <button id="cancel-modal" class="btn-secondary">Cancel</button>
+                <button id="submit-request" class="btn-primary" disabled>Send to JDownloader</button>
+            </div>
+            <div id="modal-status" class="status-text hidden"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

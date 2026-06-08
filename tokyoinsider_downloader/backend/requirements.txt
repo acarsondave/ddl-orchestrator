@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+myjdapi
+httpx
+pydantic
+python-dotenv
