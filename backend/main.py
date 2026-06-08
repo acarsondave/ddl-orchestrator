@@ -12,6 +12,30 @@ load_dotenv()
 
 app = FastAPI()
 
+import time
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+# Simple in-memory rate limiting (30 requests per minute per IP)
+rate_limits = {}
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    client_ip = request.client.host
+    now = time.time()
+    
+    if client_ip not in rate_limits:
+        rate_limits[client_ip] = []
+        
+    # Remove old requests
+    rate_limits[client_ip] = [t for t in rate_limits[client_ip] if now - t < 60]
+    
+    if len(rate_limits[client_ip]) >= 30:
+        return JSONResponse(status_code=429, content={"detail": "Too many requests. Please slow down."})
+        
+    rate_limits[client_ip].append(now)
+    return await call_next(request)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://ddl-orchestrator.minirecc.com", "http://localhost:8080", "http://127.0.0.1:8080"],
