@@ -287,7 +287,14 @@ class Universal111477Provider(Provider):
         return sorted_links[0][1]
 
     def get_links(self, episode_url: str) -> list[str]:
-        return [episode_url]
+        import urllib.request
+        req = urllib.request.Request(episode_url, headers={'User-Agent': 'Mozilla/5.0'}, method='HEAD')
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return [resp.url]
+        except Exception as e:
+            print(f"Failed to resolve redirect for {episode_url}: {e}")
+            return [episode_url]
 
 class ProviderRegistry:
     def __init__(self):
@@ -324,6 +331,9 @@ def score_link(link: str) -> int:
         
     if ".mkv" in link_lower:
         score += 50
+        
+    if link_lower.endswith(".mkv") or link_lower.endswith(".mp4"):
+        score += 10000
         
     return score
 
