@@ -1,7 +1,7 @@
 import urllib.request
 import re
 import concurrent.futures
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, unquote
 
 class Provider:
     id: str
@@ -83,11 +83,16 @@ class Universal111477Provider(Provider):
         matches = re.findall(r'data-name="([^"]+)".*?data-url="([^"]+)"', html)
         
         all_links = []
+        directories_to_crawl = []
+        
         for name, url_path in matches:
             name_lower = name.lower()
             if name_lower.endswith('.mkv') or name_lower.endswith('.mp4'):
                 full_url = urljoin("https://a.111477.xyz", url_path)
                 all_links.append((name, full_url))
+            elif "." not in name and name_lower not in ["asiandrama", "kdrama", "misc", "movies", "tvs"]:
+                full_url = urljoin("https://a.111477.xyz", url_path)
+                directories_to_crawl.append(full_url)
                 
         if media_type == "movie":
             is_movie, is_tv = True, False
@@ -96,6 +101,20 @@ class Universal111477Provider(Provider):
         else:
             is_tv = "[TV]" in anime_name or "Season" in anime_url or "Episode" in anime_url
             is_movie = "[MOVIE]" in anime_name
+            
+        # If it's a TV show and directories exist, crawl exactly 1 level deep to find season episodes
+        if is_tv and directories_to_crawl:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                futures = {executor.submit(self.fetch_html, d_url): d_url for d_url in directories_to_crawl}
+                for future in concurrent.futures.as_completed(futures):
+                    sub_html = future.result()
+                    if sub_html:
+                        sub_matches = re.findall(r'data-name="([^"]+)".*?data-url="([^"]+)"', sub_html)
+                        for sub_name, sub_url_path in sub_matches:
+                            sub_name_lower = sub_name.lower()
+                            if sub_name_lower.endswith('.mkv') or sub_name_lower.endswith('.mp4'):
+                                sub_full = urljoin("https://a.111477.xyz", sub_url_path)
+                                all_links.append((sub_name, sub_full))
         
         if is_movie and not is_tv:
             best = self._pick_best(all_links)
@@ -103,19 +122,31 @@ class Universal111477Provider(Provider):
         else:
             groups = {}
             for name, full_url in all_links:
+                # Find Season
+                s_match = re.search(r'S(\d{1,2})', name, re.IGNORECASE)
+                if not s_match:
+                    s_match = re.search(r'Season\s*(\d{1,2})', name, re.IGNORECASE)
+                if not s_match:
+                    s_match = re.search(r'Season\s*(\d{1,2})', unquote(full_url), re.IGNORECASE)
+
+                season = int(s_match.group(1)) if s_match else 1
+                
+                # Find Episode
                 ep_match = re.search(r'(?:S\d+E|E|Ep\s*|Episode\s*|-\s*)(\d{1,4})', name, re.IGNORECASE)
                 if ep_match:
                     ep_num = int(ep_match.group(1))
-                    if ep_num not in groups:
-                        groups[ep_num] = []
-                    groups[ep_num].append((name, full_url))
+                    group_key = f"S{season:02d}E{ep_num:02d}"
+                    if group_key not in groups:
+                        groups[group_key] = []
+                    groups[group_key].append((name, full_url))
                 else:
                     if "misc" not in groups: groups["misc"] = []
                     groups["misc"].append((name, full_url))
             
             final_links = []
-            for ep, eps_list in groups.items():
-                best = self._pick_best(eps_list)
+            # Sort keys so episodes are returned in S01E01 order
+            for ep in sorted(groups.keys()):
+                best = self._pick_best(groups[ep])
                 if best: final_links.append(best)
             return final_links
 
