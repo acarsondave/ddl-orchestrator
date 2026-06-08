@@ -320,13 +320,23 @@ function resetInactivity() {
     window.addEventListener(evt, resetInactivity, { passive: true })
 );
 
-// Track tab visibility
+// Track tab visibility and window focus
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
+        isIdle = true;
         stopPollingTasks();
     } else {
         resetInactivity();
     }
+});
+
+window.addEventListener("blur", () => {
+    isIdle = true;
+    stopPollingTasks();
+});
+
+window.addEventListener("focus", () => {
+    resetInactivity();
 });
 
 resetInactivity();
@@ -335,7 +345,7 @@ resetInactivity();
 // Tasks View
 // ------------------------------------
 function startPollingTasks() {
-    if (isIdle || document.visibilityState === "hidden") return;
+    if (isIdle || document.visibilityState === "hidden" || !document.hasFocus()) return;
     loadTasks();
     if (!tasksPollingInterval) {
         tasksPollingInterval = setInterval(loadTasks, 5000);
@@ -350,7 +360,7 @@ function stopPollingTasks() {
 }
 
 async function loadTasks() {
-    if (isIdle || document.visibilityState === "hidden") {
+    if (isIdle || document.visibilityState === "hidden" || !document.hasFocus()) {
         stopPollingTasks();
         return;
     }
