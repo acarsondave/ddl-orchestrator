@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:8080/api";
+const API_URL = "https://acarson-ddl-orchestrator.fly.dev/api";
 
 const authScreen = document.getElementById("auth-screen");
 const appScreen = document.getElementById("app-screen");
