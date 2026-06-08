@@ -86,6 +86,9 @@ def score_link(link: str) -> int:
     if any(k in link_lower for k in ['hevc', 'x265', 'h265']):
         score -= 100
         
+    if ".mkv" in link_lower:
+        score += 5
+        
     return score
 
 def get_best_link(links: list[str]) -> str | None:
