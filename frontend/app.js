@@ -53,11 +53,18 @@ if (token) {
 }
 
 async function verifyAndLoadApp() {
+    // Show a clean loading state on the auth screen while verifying
+    setBtnState(unlockBtn, unlockText, unlockSpinner, true, "Verifying session...");
+    apiKeyInput.disabled = true;
+    
     try {
         await loadProviders();
         showApp();
     } catch (e) {
         forceLogout();
+    } finally {
+        setBtnState(unlockBtn, unlockText, unlockSpinner, false, "Unlock");
+        apiKeyInput.disabled = false;
     }
 }
 
