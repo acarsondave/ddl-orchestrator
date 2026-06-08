@@ -239,42 +239,133 @@ function renderResults(animeList) {
 function openModal(title) {
     selectedAnime = title;
     modalAnimeName.textContent = title;
-    providerUrlInput.value = "";
     modalStatus.className = "status-text hidden";
-    const dryRunResults = document.getElementById("dry-run-results");
-    if (dryRunResults) dryRunResults.classList.add("hidden");
+    
+    // Reset steps
+    document.getElementById("modal-step-1").classList.remove("hidden");
+    document.getElementById("modal-step-2").classList.add("hidden");
+    document.getElementById("modal-step-3").classList.add("hidden");
+    
+    // Reset inputs & states
+    document.getElementById("find-matches-btn").disabled = false;
+    document.getElementById("matches-list").innerHTML = "";
+    document.getElementById("dry-run-results").classList.add("hidden");
+    submitRequest.disabled = false;
+    testExtractionBtn.disabled = false;
+    
     requestModal.classList.remove("hidden");
-    submitRequest.disabled = true;
-    testExtractionBtn.disabled = true;
 }
-
-providerUrlInput.addEventListener("input", () => {
-    const hasValue = !!providerUrlInput.value.trim();
-    submitRequest.disabled = !hasValue;
-    testExtractionBtn.disabled = !hasValue;
-});
 
 cancelModal.addEventListener("click", () => {
     requestModal.classList.add("hidden");
 });
 
-const dryRunResults = document.getElementById("dry-run-results");
-const dryRunList = document.getElementById("dry-run-list");
+document.getElementById("back-to-step-1").addEventListener("click", () => {
+    document.getElementById("modal-step-2").classList.add("hidden");
+    document.getElementById("modal-step-1").classList.remove("hidden");
+});
 
-testExtractionBtn.addEventListener("click", async () => {
-    const url = providerUrlInput.value.trim();
+document.getElementById("back-to-step-2").addEventListener("click", () => {
+    document.getElementById("modal-step-3").classList.add("hidden");
+    document.getElementById("modal-step-2").classList.remove("hidden");
+    document.getElementById("dry-run-results").classList.add("hidden");
+});
+
+// Step 1: Find Matches
+const findMatchesBtn = document.getElementById("find-matches-btn");
+const findText = document.getElementById("find-text");
+const findSpinner = document.getElementById("find-spinner");
+
+findMatchesBtn.addEventListener("click", async () => {
     const pid = providerSelect.value;
     const mediaType = document.getElementById("media-type-select").value;
     
-    if (!url || !url.startsWith("http")) {
-        showModalStatus("Please enter a valid URL.", "error");
-        return;
-    }
     if (!pid) {
         showModalStatus("Please select a provider.", "error");
         return;
     }
 
+    showModalStatus("", "");
+    setBtnState(findMatchesBtn, findText, findSpinner, true, "Searching...");
+
+    try {
+        const res = await apiFetch("/search_provider", {
+            method: "POST",
+            body: JSON.stringify({
+                provider_id: pid,
+                query: selectedAnime,
+                media_type: mediaType
+            })
+        });
+        
+        const matchesList = document.getElementById("matches-list");
+        matchesList.innerHTML = "";
+        
+        if (!res.results || res.results.length === 0) {
+            matchesList.innerHTML = `<div class="no-matches">No matches found on this provider.</div>`;
+        } else {
+            res.results.forEach(match => {
+                const item = document.createElement("div");
+                item.className = "match-item";
+                
+                const contentDiv = document.createElement("div");
+                contentDiv.className = "match-item-content";
+                
+                const titleSpan = document.createElement("span");
+                titleSpan.className = "match-title";
+                titleSpan.textContent = match.title;
+                
+                const urlSpan = document.createElement("span");
+                urlSpan.className = "match-url";
+                urlSpan.textContent = match.url.replace(/^https?:\/\//, '');
+                
+                contentDiv.appendChild(titleSpan);
+                contentDiv.appendChild(urlSpan);
+                
+                const link = document.createElement("a");
+                link.className = "match-link";
+                link.href = match.url;
+                link.target = "_blank";
+                link.innerHTML = "&#128279;";
+                link.title = "Open in new tab to verify";
+                
+                // Prevent row click when clicking the link
+                link.addEventListener("click", (e) => e.stopPropagation());
+                
+                item.appendChild(contentDiv);
+                item.appendChild(link);
+                
+                // Select match
+                item.addEventListener("click", () => {
+                    selectedProviderUrl = match.url;
+                    document.getElementById("selected-match-display").textContent = match.title;
+                    document.getElementById("modal-step-2").classList.add("hidden");
+                    document.getElementById("modal-step-3").classList.remove("hidden");
+                    showModalStatus("", "");
+                });
+                
+                matchesList.appendChild(item);
+            });
+        }
+        
+        document.getElementById("modal-step-1").classList.add("hidden");
+        document.getElementById("modal-step-2").classList.remove("hidden");
+        
+    } catch (e) {
+        showModalStatus(e.message, "error");
+    } finally {
+        setBtnState(findMatchesBtn, findText, findSpinner, false, "Find Matches");
+    }
+});
+
+let selectedProviderUrl = "";
+const dryRunResults = document.getElementById("dry-run-results");
+const dryRunList = document.getElementById("dry-run-list");
+
+testExtractionBtn.addEventListener("click", async () => {
+    const pid = providerSelect.value;
+    const mediaType = document.getElementById("media-type-select").value;
+    
     showModalStatus("", "");
     setBtnState(testExtractionBtn, testText, testSpinner, true, "Testing...");
     submitRequest.disabled = true;
@@ -285,7 +376,7 @@ testExtractionBtn.addEventListener("click", async () => {
             body: JSON.stringify({
                 provider_id: pid,
                 anime_name: selectedAnime,
-                anime_url: url,
+                anime_url: selectedProviderUrl,
                 media_type: mediaType,
                 dry_run: true
             })
@@ -295,7 +386,6 @@ testExtractionBtn.addEventListener("click", async () => {
         if (res.links && res.links.length > 0) {
             res.links.forEach(link => {
                 const li = document.createElement("li");
-                // Decode URI component to make filenames readable in the dry run
                 try {
                     li.textContent = decodeURIComponent(link.split('/').pop() || link);
                 } catch (e) {
@@ -314,24 +404,14 @@ testExtractionBtn.addEventListener("click", async () => {
         showModalStatus(e.message, "error");
         dryRunResults.classList.add("hidden");
     } finally {
-        setBtnState(testExtractionBtn, testText, testSpinner, false);
+        setBtnState(testExtractionBtn, testText, testSpinner, false, "Dry Run");
         submitRequest.disabled = false;
     }
 });
 
 submitRequest.addEventListener("click", async () => {
-    const url = providerUrlInput.value.trim();
     const pid = providerSelect.value;
     const mediaType = document.getElementById("media-type-select").value;
-    
-    if (!url || !url.startsWith("http")) {
-        showModalStatus("Please enter a valid URL.", "error");
-        return;
-    }
-    if (!pid) {
-        showModalStatus("Please select a provider.", "error");
-        return;
-    }
 
     showModalStatus("", "");
     setBtnState(submitRequest, submitText, submitSpinner, true, "Scraping...");
@@ -343,7 +423,7 @@ submitRequest.addEventListener("click", async () => {
             body: JSON.stringify({
                 provider_id: pid,
                 anime_name: selectedAnime,
-                anime_url: url,
+                anime_url: selectedProviderUrl,
                 media_type: mediaType,
                 dry_run: false
             })
@@ -351,7 +431,7 @@ submitRequest.addEventListener("click", async () => {
         showModalStatus(res.message || "Successfully sent to JDownloader!", "success");
         setTimeout(() => {
             requestModal.classList.add("hidden");
-            navTasks.click(); // Auto-switch to tasks
+            navTasks.click();
         }, 2000);
     } catch (e) {
         showModalStatus(e.message, "error");

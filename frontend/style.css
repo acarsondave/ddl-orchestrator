@@ -545,3 +545,74 @@ button {
         width: 100%;
     }
 }
+
+/* Match List UI */
+.matches-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.match-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.match-item:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--accent-primary);
+}
+.match-item-content {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.match-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.match-url {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.match-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-left: 10px;
+}
+.match-link:hover {
+    background: var(--accent-primary);
+    color: white;
+}
+.no-matches {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border: 1px dashed var(--border-color);
+}

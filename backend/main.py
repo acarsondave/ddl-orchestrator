@@ -31,12 +31,29 @@ def verify_token(authorization: str = Header(None)):
     if len(token) != len(API_KEY) or not hmac.compare_digest(token, API_KEY):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+class SearchProviderPayload(BaseModel):
+    provider_id: str
+    query: str
+    media_type: str = "auto"
+
 class RequestAnimePayload(BaseModel):
     provider_id: str
     anime_name: str
     anime_url: HttpUrl
     media_type: str = "auto"
     dry_run: bool = False
+
+@app.post("/api/search_provider")
+def search_provider(payload: SearchProviderPayload, _=Depends(verify_token)):
+    provider = registry.get(payload.provider_id)
+    if not provider:
+        raise HTTPException(status_code=400, detail="Invalid provider")
+        
+    try:
+        results = provider.search_provider(payload.query, payload.media_type)
+        return {"success": True, "results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/providers")
 def list_providers(_=Depends(verify_token)):

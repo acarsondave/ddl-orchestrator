@@ -1,13 +1,21 @@
 import urllib.request
 import re
 import concurrent.futures
+import time
+from difflib import SequenceMatcher
 from urllib.parse import urljoin, urlparse, unquote
+
+_SEARCH_CACHE = {}
+_CACHE_TTL = 3600
 
 class Provider:
     id: str
     name: str
 
     def health_check(self) -> bool:
+        raise NotImplementedError
+
+    def search_provider(self, query: str, media_type: str = "auto") -> list[dict]:
         raise NotImplementedError
 
     def get_episodes(self, anime_url: str, anime_name: str = "", media_type: str = "auto") -> list[str]:
@@ -34,6 +42,43 @@ class TokyoInsiderProvider(Provider):
     def health_check(self) -> bool:
         html = self.fetch_html("https://www.tokyoinsider.com")
         return bool(html and "Tokyo Insider" in html)
+
+    def search_provider(self, query: str, media_type: str = "auto") -> list[dict]:
+        global _SEARCH_CACHE
+        cache_key = "tokyoinsider_list"
+        
+        if cache_key not in _SEARCH_CACHE or time.time() - _SEARCH_CACHE[cache_key]['time'] > _CACHE_TTL:
+            html = self.fetch_html("https://www.tokyoinsider.com/anime/list")
+            _SEARCH_CACHE[cache_key] = {'time': time.time(), 'html': html}
+        else:
+            html = _SEARCH_CACHE[cache_key]['html']
+            
+        if not html: return []
+        
+        matches = re.findall(r'href="(/anime/[^"]+)">([^<]+)</a>', html)
+        
+        results = []
+        query_lower = query.lower()
+        query_words = set(re.findall(r'\w+', query_lower))
+        
+        for path, title in matches:
+            if path in ["/anime/list", "/anime/search"]: continue
+            title_lower = title.lower()
+            
+            ratio = SequenceMatcher(None, query_lower, title_lower).ratio()
+            title_words = set(re.findall(r'\w+', title_lower))
+            if query_words.issubset(title_words):
+                ratio += 1.0
+                
+            if ratio > 0.4 or query_lower in title_lower:
+                results.append({
+                    "title": title,
+                    "url": "https://www.tokyoinsider.com" + path,
+                    "score": ratio
+                })
+                
+        results.sort(key=lambda x: x['score'], reverse=True)
+        return [{"title": r["title"], "url": r["url"]} for r in results[:20]]
 
     def get_episodes(self, anime_url: str, anime_name: str = "", media_type: str = "auto") -> list[str]:
         html = self.fetch_html(anime_url)
@@ -75,6 +120,57 @@ class Universal111477Provider(Provider):
     def health_check(self) -> bool:
         html = self.fetch_html("https://a.111477.xyz/")
         return "Index of" in html or bool(html)
+
+    def search_provider(self, query: str, media_type: str = "auto") -> list[dict]:
+        global _SEARCH_CACHE
+        
+        dirs_to_fetch = ["/movies/", "/tvs/", "/kdrama/", "/asiandrama/"]
+        
+        if media_type == "movie":
+            dirs_to_fetch = ["/movies/"]
+        elif media_type == "tv":
+            dirs_to_fetch = ["/tvs/", "/kdrama/", "/asiandrama/"]
+            
+        all_matches = []
+        
+        def fetch_dir(d):
+            cache_key = f"111477_{d}"
+            if cache_key not in _SEARCH_CACHE or time.time() - _SEARCH_CACHE[cache_key]['time'] > _CACHE_TTL:
+                html = self.fetch_html(f"https://a.111477.xyz{d}")
+                _SEARCH_CACHE[cache_key] = {'time': time.time(), 'html': html}
+            return d, _SEARCH_CACHE[cache_key]['html']
+            
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(fetch_dir, d) for d in dirs_to_fetch]
+            for future in concurrent.futures.as_completed(futures):
+                d, html = future.result()
+                if html:
+                    matches = re.findall(r'data-name="([^"]+)".*?data-url="([^"]+)"', html)
+                    for name, url_path in matches:
+                        if "." not in name and name.lower() not in ["asiandrama", "kdrama", "misc", "movies", "tvs"]:
+                            all_matches.append((name, url_path, d.strip('/')))
+
+        results = []
+        query_lower = query.lower()
+        query_words = set(re.findall(r'\w+', query_lower))
+        
+        for name, url_path, category in all_matches:
+            name_lower = name.lower()
+            ratio = SequenceMatcher(None, query_lower, name_lower).ratio()
+            
+            name_words = set(re.findall(r'\w+', name_lower))
+            if query_words.issubset(name_words):
+                ratio += 1.0
+                
+            if ratio > 0.4 or query_lower in name_lower:
+                results.append({
+                    "title": f"{name} [{category}]",
+                    "url": "https://a.111477.xyz" + url_path,
+                    "score": ratio
+                })
+                
+        results.sort(key=lambda x: x['score'], reverse=True)
+        return [{"title": r["title"], "url": r["url"]} for r in results[:20]]
 
     def get_episodes(self, anime_url: str, anime_name: str = "", media_type: str = "auto") -> list[str]:
         html = self.fetch_html(anime_url)

@@ -80,47 +80,73 @@
     </div>
 
     <div id="request-modal" class="modal hidden">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 550px; width: 100%;">
             <h2 id="modal-title">Request Anime</h2>
-            <p class="modal-subtitle">Select provider and enter the exact URL for <strong id="modal-anime-name"></strong>.</p>
+            <p class="modal-subtitle">Configure provider settings for <strong id="modal-anime-name"></strong>.</p>
             
-            <div class="input-group">
-                <select id="provider-select" class="provider-select">
-                    <option value="">Loading providers...</option>
-                </select>
+            <!-- STEP 1: Search Provider -->
+            <div id="modal-step-1" class="modal-step">
+                <div class="input-group">
+                    <select id="provider-select" class="provider-select">
+                        <option value="">Loading providers...</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <select id="media-type-select" class="provider-select">
+                        <option value="auto">Auto-Detect (Based on Title / Filenames)</option>
+                        <option value="movie">Force Movie (Picks 1 Best Link Overall)</option>
+                        <option value="tv">Force TV Show (Picks 1 Best Link Per Episode)</option>
+                    </select>
+                </div>
+                
+                <div class="modal-actions" style="display: flex; gap: 8px; margin-top: 20px;">
+                    <button id="cancel-modal" class="btn-secondary" style="flex: 1;">Cancel</button>
+                    <button id="find-matches-btn" class="btn-primary" disabled style="flex: 2;">
+                        <span id="find-text">Find Matches</span>
+                        <div id="find-spinner" class="spinner-small hidden"></div>
+                    </button>
+                </div>
             </div>
             
-            <div class="input-group">
-                <select id="media-type-select" class="provider-select">
-                    <option value="auto">Auto-Detect (Based on Title / Filenames)</option>
-                    <option value="movie">Force Movie (Picks 1 Best Link Overall)</option>
-                    <option value="tv">Force TV Show (Picks 1 Best Link Per Episode)</option>
-                </select>
+            <!-- STEP 2: Verify Results -->
+            <div id="modal-step-2" class="modal-step hidden">
+                <div id="matches-list" class="matches-list" style="max-height: 250px; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                </div>
+                
+                <div class="modal-actions" style="display: flex; gap: 8px; margin-top: 20px;">
+                    <button id="back-to-step-1" class="btn-secondary" style="flex: 1;">Back</button>
+                </div>
+            </div>
+
+            <!-- STEP 3: Extraction (Dry Run / Send) -->
+            <div id="modal-step-3" class="modal-step hidden">
+                <div class="selected-match-card" style="background: var(--bg-tertiary); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); text-align: left;">
+                    <p class="text-muted" style="margin: 0 0 4px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Selected Match</p>
+                    <div id="selected-match-display" style="font-weight: 500; font-size: 14px; color: var(--text-primary); word-break: break-all;"></div>
+                </div>
+                
+                <div class="modal-actions" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px;">
+                    <button id="back-to-step-2" class="btn-secondary" style="flex: 1; min-width: 80px;">Back</button>
+                    <button id="test-extraction" class="btn-secondary" style="flex: 1; min-width: 100px;">
+                        <span id="test-text">Dry Run</span>
+                        <div id="test-spinner" class="spinner-small hidden"></div>
+                    </button>
+                    <button id="submit-request" class="btn-primary" style="flex: 2; min-width: 150px;">
+                        <span id="submit-text">Send to JDownloader</span>
+                        <div id="submit-spinner" class="spinner-small hidden"></div>
+                    </button>
+                </div>
+                
+                <!-- Container for Dry Run Results -->
+                <div id="dry-run-results" class="hidden" style="margin-top: 15px; max-height: 200px; overflow-y: auto; text-align: left; background: var(--bg-tertiary); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <h4 style="margin: 0 0 10px 0; font-size: 14px; color: var(--text-primary);">Extracted Links:</h4>
+                    <ul id="dry-run-list" style="list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--text-secondary); word-break: break-all; display: flex; flex-direction: column; gap: 6px;">
+                    </ul>
+                </div>
             </div>
             
-            <div class="input-group">
-                <input type="url" id="provider-url" placeholder="Enter provider URL...">
-            </div>
-            
-            <div class="modal-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button id="cancel-modal" class="btn-secondary" style="flex: 1; min-width: 80px;">Cancel</button>
-                <button id="test-extraction" class="btn-secondary" disabled style="flex: 1; min-width: 100px;">
-                    <span id="test-text">Dry Run</span>
-                    <div id="test-spinner" class="spinner-small hidden"></div>
-                </button>
-                <button id="submit-request" class="btn-primary" disabled style="flex: 2; min-width: 150px;">
-                    <span id="submit-text">Send to JDownloader</span>
-                    <div id="submit-spinner" class="spinner-small hidden"></div>
-                </button>
-            </div>
-            <div id="modal-status" class="status-text hidden" style="margin-top: 10px;"></div>
-            
-            <!-- Container for Dry Run Results -->
-            <div id="dry-run-results" class="hidden" style="margin-top: 15px; max-height: 200px; overflow-y: auto; text-align: left; background: var(--bg-tertiary); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
-                <h4 style="margin: 0 0 10px 0; font-size: 14px; color: var(--text-primary);">Extracted Links:</h4>
-                <ul id="dry-run-list" style="list-style: none; padding: 0; margin: 0; font-size: 12px; color: var(--text-secondary); word-break: break-all;">
-                </ul>
-            </div>
+            <div id="modal-status" class="status-text hidden" style="margin-top: 15px;"></div>
         </div>
     </div>
 
