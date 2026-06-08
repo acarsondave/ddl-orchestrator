@@ -45,20 +45,21 @@ class TokyoInsiderProvider(Provider):
 
     def search_provider(self, query: str, media_type: str = "auto") -> list[dict]:
         global _SEARCH_CACHE
-        cache_key = "tokyoinsider_list"
         
+        clean_query = re.sub(r'^\[.*?\]\s*', '', query)
+        
+        cache_key = "ti_master_index"
         if cache_key not in _SEARCH_CACHE or time.time() - _SEARCH_CACHE[cache_key]['time'] > _CACHE_TTL:
             html = self.fetch_html("https://www.tokyoinsider.com/anime/list")
             _SEARCH_CACHE[cache_key] = {'time': time.time(), 'html': html}
-        else:
-            html = _SEARCH_CACHE[cache_key]['html']
             
-        if not html: return []
+        html = _SEARCH_CACHE[cache_key]['html']
         
-        matches = re.findall(r'href="(/anime/[^"]+)">([^<]+)</a>', html)
+        # Extract all <a href="/anime/...">Name</a>
+        matches = re.findall(r'<a href="/anime/([^"]+)">([^<]+)</a>', html)
         
         results = []
-        query_lower = query.lower()
+        query_lower = clean_query.lower()
         query_words = set(re.findall(r'\w+', query_lower))
         
         for path, title in matches:
@@ -152,7 +153,8 @@ class Universal111477Provider(Provider):
                             all_matches.append((name, url_path, d.strip('/')))
 
         results = []
-        query_lower = query.lower()
+        clean_query = re.sub(r'^\[.*?\]\s*', '', query)
+        query_lower = clean_query.lower()
         query_words = set(re.findall(r'\w+', query_lower))
         
         for name, url_path, category in all_matches:
