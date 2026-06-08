@@ -288,13 +288,32 @@ class Universal111477Provider(Provider):
 
     def get_links(self, episode_url: str) -> list[str]:
         import urllib.request
+        from urllib.error import HTTPError
+        import time
+        
         req = urllib.request.Request(episode_url, headers={'User-Agent': 'Mozilla/5.0'}, method='HEAD')
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                return [resp.url]
-        except Exception as e:
-            print(f"Failed to resolve redirect for {episode_url}: {e}")
-            return [episode_url]
+        max_retries = 3
+        
+        # We just crawled the index page, so let's breathe for 1 second to avoid instant 429s from the proxy
+        time.sleep(1)
+        
+        for attempt in range(max_retries):
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    return [resp.url]
+            except HTTPError as e:
+                if e.code in (429, 500, 502, 503, 504):
+                    print(f"Redirect resolution rate-limited ({e.code}). Retrying {attempt+1}/{max_retries} for {episode_url}")
+                    time.sleep(2 ** attempt)
+                    continue
+                print(f"Failed to resolve redirect for {episode_url} (HTTP {e.code})")
+                break
+            except Exception as e:
+                print(f"Failed to resolve redirect for {episode_url}: {e}")
+                break
+                
+        # If all retries fail, return the original URL and pray JDownloader handles it
+        return [episode_url]
 
 class ProviderRegistry:
     def __init__(self):
