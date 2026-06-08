@@ -6,6 +6,7 @@ const authForm = document.getElementById("auth-form");
 const apiKeyInput = document.getElementById("api-key");
 const authError = document.getElementById("auth-error");
 const logoutBtn = document.getElementById("logout-btn");
+const unlockBtn = document.getElementById("unlock-btn");
 
 const searchInput = document.getElementById("search-input");
 const searchBtn = document.getElementById("search-btn");
@@ -24,28 +25,55 @@ let token = localStorage.getItem("orchestrator_token");
 let selectedAnime = null;
 let providersLoaded = false;
 
+// Initial auth check
 if (token) {
-    showApp();
+    verifyAndLoadApp();
 }
 
-authForm.addEventListener("submit", (e) => {
+async function verifyAndLoadApp() {
+    try {
+        await loadProviders();
+        showApp();
+    } catch (e) {
+        forceLogout();
+    }
+}
+
+authForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const key = apiKeyInput.value.trim();
-    if (key) {
-        token = key;
+    if (!key) return;
+
+    token = key;
+    unlockBtn.disabled = true;
+    unlockBtn.textContent = "Verifying...";
+    authError.classList.add("hidden");
+
+    try {
+        await loadProviders();
         localStorage.setItem("orchestrator_token", token);
         showApp();
+    } catch (e) {
+        token = null;
+        authError.textContent = "Invalid access key.";
+        authError.classList.remove("hidden");
+    } finally {
+        unlockBtn.disabled = false;
+        unlockBtn.textContent = "Unlock";
     }
 });
 
-logoutBtn.addEventListener("click", () => {
+logoutBtn.addEventListener("click", forceLogout);
+
+function forceLogout() {
     token = null;
     localStorage.removeItem("orchestrator_token");
     authScreen.classList.remove("hidden");
     authScreen.classList.add("active");
     appScreen.classList.add("hidden");
     appScreen.classList.remove("active");
-});
+    apiKeyInput.value = "";
+}
 
 function showApp() {
     authScreen.classList.add("hidden");
@@ -66,8 +94,7 @@ async function apiFetch(endpoint, options = {}) {
     });
 
     if (res.status === 401) {
-        logoutBtn.click();
-        authError.classList.remove("hidden");
+        forceLogout();
         throw new Error("Unauthorized");
     }
 
@@ -80,26 +107,21 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 async function loadProviders() {
-    try {
-        const providers = await apiFetch("/providers");
-        providerSelect.innerHTML = "";
-        
-        let hasHealthy = false;
-        providers.forEach(p => {
-            const opt = document.createElement("option");
-            opt.value = p.id;
-            opt.textContent = `${p.name} ${p.healthy ? '(🟢 Active)' : '(🔴 Down)'}`;
-            if (!p.healthy) opt.disabled = true;
-            else hasHealthy = true;
-            providerSelect.appendChild(opt);
-        });
+    const providers = await apiFetch("/providers");
+    providerSelect.innerHTML = "";
+    
+    let hasHealthy = false;
+    providers.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = `${p.name} ${p.healthy ? '(🟢 Active)' : '(🔴 Down)'}`;
+        if (!p.healthy) opt.disabled = true;
+        else hasHealthy = true;
+        providerSelect.appendChild(opt);
+    });
 
-        submitRequest.disabled = !hasHealthy;
-        providersLoaded = true;
-    } catch (e) {
-        providerSelect.innerHTML = `<option value="">Failed to load providers</option>`;
-        submitRequest.disabled = true;
-    }
+    submitRequest.disabled = !hasHealthy;
+    providersLoaded = true;
 }
 
 searchBtn.addEventListener("click", async () => {
@@ -154,10 +176,6 @@ function openModal(title) {
     providerUrlInput.value = "";
     modalStatus.className = "status-text hidden";
     requestModal.classList.remove("hidden");
-    
-    if (!providersLoaded) {
-        loadProviders();
-    }
 }
 
 cancelModal.addEventListener("click", () => {
