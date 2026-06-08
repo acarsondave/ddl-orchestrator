@@ -102,10 +102,13 @@
                 <input type="url" id="provider-url" placeholder="Enter provider URL...">
             </div>
             
-            <div class="modal-actions" style="display: flex; gap: 8px;">
-                <button id="cancel-modal" class="btn-secondary">Cancel</button>
-                <button id="test-extraction" class="btn-secondary" disabled>Dry Run</button>
-                <button id="submit-request" class="btn-primary" disabled>
+            <div class="modal-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button id="cancel-modal" class="btn-secondary" style="flex: 1; min-width: 80px;">Cancel</button>
+                <button id="test-extraction" class="btn-secondary" disabled style="flex: 1; min-width: 100px;">
+                    <span id="test-text">Dry Run</span>
+                    <div id="test-spinner" class="spinner-small hidden"></div>
+                </button>
+                <button id="submit-request" class="btn-primary" disabled style="flex: 2; min-width: 150px;">
                     <span id="submit-text">Send to JDownloader</span>
                     <div id="submit-spinner" class="spinner-small hidden"></div>
                 </button>

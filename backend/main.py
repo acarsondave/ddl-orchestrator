@@ -54,41 +54,43 @@ import urllib.parse
 import re
 import asyncio
 
-def search_tmdb(query: str):
-    url = f"https://www.themoviedb.org/search?query={urllib.parse.quote(query)}"
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'})
-    try:
-        html = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
-    except Exception:
-        return []
+import json
 
-    results = []
-    cards_html = re.findall(r'class="comp:media-card(.*?)</p></div></div></div></div>', html, re.DOTALL)
-    
-    for card_html in cards_html:
-        media_type = re.search(r'data-media-type="([^"]+)"', card_html)
-        title = re.search(r'<h2[^>]*><span>([^<]+)</span></h2>', card_html)
-        date = re.search(r'<span class="release_date[^>]*>([^<]+)</span>', card_html)
-        img = re.search(r'src="(https://media\.themoviedb\.org/t/p/[^"]+)"', card_html)
-        
-        if not media_type or not title: continue
-        mt = media_type.group(1)
-        if mt not in ["movie", "tv"]: continue
-        
-        t = title.group(1).replace('&#39;', "'")
-        d = date.group(1).split(',')[-1].strip() if date else ""
-        i = img.group(1) if img else f"https://via.placeholder.com/200x300/121212/ffffff?text={urllib.parse.quote(t)}"
-        
-        results.append({
-            "title": f"[{mt.upper()}] {t}",
-            "year": d,
-            "images": {"jpg": {"image_url": i}}
-        })
-    return results
+def search_imdb(query: str):
+    if not query: return []
+    # IMDB autocomplete requires the first letter in the path
+    first_char = urllib.parse.quote(query[0].lower())
+    url = f"https://v3.sg.media-imdb.com/suggestion/{first_char}/{urllib.parse.quote(query)}.json"
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    try:
+        resp = urllib.request.urlopen(req, timeout=5).read().decode('utf-8')
+        data = json.loads(resp)
+        results = []
+        for item in data.get('d', []):
+            if item.get('qid') not in ["movie", "tvSeries", "tvMiniSeries"]:
+                continue
+            
+            mt = "MOVIE" if item['qid'] == "movie" else "TV"
+            title = item.get('l', '')
+            year = item.get('y', '')
+            if not year and item.get('yr'):
+                year = item.get('yr').split('-')[0]
+                
+            img = item.get('i', {}).get('imageUrl', f"https://via.placeholder.com/200x300/121212/ffffff?text={urllib.parse.quote(title)}")
+            
+            results.append({
+                "title": f"[{mt}] {title}",
+                "year": str(year),
+                "images": {"jpg": {"image_url": img}}
+            })
+        return results
+    except Exception as e:
+        print("IMDB Error:", e)
+        return []
 
 @app.get("/api/search")
 async def search_anime(q: str, _=Depends(verify_token)):
-    tmdb_results = await asyncio.to_thread(search_tmdb, q)
+    imdb_results = await asyncio.to_thread(search_imdb, q)
     
     jikan_results = []
     try:
@@ -102,7 +104,7 @@ async def search_anime(q: str, _=Depends(verify_token)):
     except Exception:
         pass
         
-    return {"data": tmdb_results[:8] + jikan_results[:5]}
+    return {"data": imdb_results[:8] + jikan_results[:5]}
 
 @app.post("/api/request")
 def request_anime(payload: RequestAnimePayload, _=Depends(verify_token)):

@@ -32,6 +32,9 @@ const cancelModal = document.getElementById("cancel-modal");
 const submitRequest = document.getElementById("submit-request");
 const submitText = document.getElementById("submit-text");
 const submitSpinner = document.getElementById("submit-spinner");
+const testExtractionBtn = document.getElementById("test-extraction");
+const testText = document.getElementById("test-text");
+const testSpinner = document.getElementById("test-spinner");
 const providerUrlInput = document.getElementById("provider-url");
 const providerSelect = document.getElementById("provider-select");
 const modalAnimeName = document.getElementById("modal-anime-name");
@@ -241,13 +244,20 @@ function openModal(title) {
     const dryRunResults = document.getElementById("dry-run-results");
     if (dryRunResults) dryRunResults.classList.add("hidden");
     requestModal.classList.remove("hidden");
+    submitRequest.disabled = true;
+    testExtractionBtn.disabled = true;
 }
+
+providerUrlInput.addEventListener("input", () => {
+    const hasValue = !!providerUrlInput.value.trim();
+    submitRequest.disabled = !hasValue;
+    testExtractionBtn.disabled = !hasValue;
+});
 
 cancelModal.addEventListener("click", () => {
     requestModal.classList.add("hidden");
 });
 
-const testExtractionBtn = document.getElementById("test-extraction");
 const dryRunResults = document.getElementById("dry-run-results");
 const dryRunList = document.getElementById("dry-run-list");
 
@@ -266,8 +276,7 @@ testExtractionBtn.addEventListener("click", async () => {
     }
 
     showModalStatus("", "");
-    testExtractionBtn.textContent = "Testing...";
-    testExtractionBtn.disabled = true;
+    setBtnState(testExtractionBtn, testText, testSpinner, true, "Testing...");
     submitRequest.disabled = true;
 
     try {
@@ -305,8 +314,7 @@ testExtractionBtn.addEventListener("click", async () => {
         showModalStatus(e.message, "error");
         dryRunResults.classList.add("hidden");
     } finally {
-        testExtractionBtn.textContent = "Dry Run";
-        testExtractionBtn.disabled = false;
+        setBtnState(testExtractionBtn, testText, testSpinner, false);
         submitRequest.disabled = false;
     }
 });

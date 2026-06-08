@@ -515,3 +515,33 @@ button {
 .modal-actions .btn-primary {
     flex: 2;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 600px) {
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+    .header-nav {
+        width: 100%;
+        overflow-x: auto;
+    }
+    #logout-btn {
+        width: 100%;
+    }
+    .modal-content {
+        padding: 24px;
+        margin: 16px;
+        width: calc(100% - 32px);
+    }
+    .grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .modal-actions {
+        flex-direction: column;
+    }
+    .modal-actions button {
+        width: 100%;
+    }
+}
