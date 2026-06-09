@@ -783,20 +783,26 @@ const commandPaletteStatus = document.getElementById("command-palette-status");
 const commandPaletteModal = document.getElementById("command-palette-modal");
 
 if (commandPaletteOverlay) {
+    function openCommandPalette() {
+        if (commandPaletteOverlay.classList.contains("hidden")) {
+            commandPaletteOverlay.classList.remove("hidden");
+            commandPaletteStatus.classList.add("hidden");
+            commandPaletteInput.value = "";
+            // small delay to allow display to toggle before focusing
+            setTimeout(() => {
+                commandPaletteOverlay.style.opacity = "1";
+                commandPaletteOverlay.style.pointerEvents = "auto";
+                commandPaletteModal.style.transform = "translateY(0)";
+                commandPaletteInput.focus();
+            }, 10);
+        }
+    }
+
     document.addEventListener("keydown", (e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === "x") {
             e.preventDefault();
             if (commandPaletteOverlay.classList.contains("hidden")) {
-                commandPaletteOverlay.classList.remove("hidden");
-                commandPaletteStatus.classList.add("hidden");
-                commandPaletteInput.value = "";
-                // small delay to allow display to toggle before focusing
-                setTimeout(() => {
-                    commandPaletteOverlay.style.opacity = "1";
-                    commandPaletteOverlay.style.pointerEvents = "auto";
-                    commandPaletteModal.style.transform = "translateY(0)";
-                    commandPaletteInput.focus();
-                }, 10);
+                openCommandPalette();
             } else {
                 closeCommandPalette();
             }
@@ -806,6 +812,23 @@ if (commandPaletteOverlay) {
             closeCommandPalette();
         }
     });
+
+    // Mobile trigger: 5 rapid taps on the logo/title
+    const headerBrand = document.querySelector(".header-brand");
+    if (headerBrand) {
+        let tapCount = 0;
+        let tapTimeout;
+        headerBrand.addEventListener("click", () => {
+            tapCount++;
+            clearTimeout(tapTimeout);
+            if (tapCount >= 5) {
+                openCommandPalette();
+                tapCount = 0;
+            } else {
+                tapTimeout = setTimeout(() => { tapCount = 0; }, 400); // 400ms to chain taps
+            }
+        });
+    }
 
     // Close on click outside
     commandPaletteOverlay.addEventListener("click", (e) => {
