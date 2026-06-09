@@ -163,19 +163,27 @@ class Universal111477Provider(Provider):
             cache_key = f"111477_{d}"
             if cache_key not in _SEARCH_CACHE or time.time() - _SEARCH_CACHE[cache_key]['time'] > _CACHE_TTL:
                 html = self.fetch_html(f"https://a.111477.xyz{d}")
-                _SEARCH_CACHE[cache_key] = {'time': time.time(), 'html': html}
+                if html:
+                    _SEARCH_CACHE[cache_key] = {'time': time.time(), 'html': html}
+                else:
+                    return d, ""
             return d, _SEARCH_CACHE[cache_key]['html']
             
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(fetch_dir, d) for d in dirs_to_fetch]
+            html_fetched = False
             for future in concurrent.futures.as_completed(futures):
                 d, html = future.result()
                 if html:
+                    html_fetched = True
                     matches = re.findall(r'data-name="([^"]+)".*?data-url="([^"]+)"', html)
                     for name, url_path in matches:
                         # Ignore system folders and hidden .parts files
                         if name.lower() not in ["asiandrama", "kdrama", "misc", "movies", "tvs"] and not name.startswith('.'):
                             all_matches.append((name, url_path, d.strip('/')))
+
+        if not html_fetched:
+            raise Exception("Provider is currently rate-limiting or blocking requests. Please try again in a few minutes.")
 
         results = []
         clean_query = re.sub(r'^\[.*?\]\s*', '', query)

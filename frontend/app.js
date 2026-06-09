@@ -167,6 +167,28 @@ async function loadProviders() {
     providersLoaded = true;
 }
 
+const refreshProvidersBtn = document.getElementById("refresh-providers-btn");
+if (refreshProvidersBtn) {
+    refreshProvidersBtn.addEventListener("click", async () => {
+        refreshProvidersBtn.style.opacity = "0.5";
+        refreshProvidersBtn.style.pointerEvents = "none";
+        
+        // Add a simple rotation animation to the inner SVG
+        const svg = refreshProvidersBtn.querySelector("svg");
+        if (svg) svg.style.animation = "spin 1s linear infinite";
+        
+        try {
+            await loadProviders();
+        } catch (e) {
+            console.error("Failed to refresh providers:", e);
+        } finally {
+            refreshProvidersBtn.style.opacity = "1";
+            refreshProvidersBtn.style.pointerEvents = "auto";
+            if (svg) svg.style.animation = "";
+        }
+    });
+}
+
 // ------------------------------------
 // Tab Navigation
 // ------------------------------------
