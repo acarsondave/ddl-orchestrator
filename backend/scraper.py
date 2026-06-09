@@ -291,7 +291,9 @@ class Universal111477Provider(Provider):
         from urllib.error import HTTPError
         import time
         
-        req = urllib.request.Request(episode_url, headers={'User-Agent': 'Mozilla/5.0'}, method='HEAD')
+        # Use a realistic browser User-Agent to bypass Cloudflare 403s on HEAD requests
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+        req = urllib.request.Request(episode_url, headers=headers, method='HEAD')
         max_retries = 3
         
         # We just crawled the index page, so let's breathe for 1 second to avoid instant 429s from the proxy
