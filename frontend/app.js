@@ -95,6 +95,8 @@ function forceLogout() {
     token = null;
     stopPollingTasks();
     localStorage.removeItem("orchestrator_token");
+    localStorage.removeItem("SECRET_PROVIDER_CODE");
+    localStorage.removeItem("SECRET_PROVIDER_CODE_TIME");
     authScreen.classList.remove("hidden");
     authScreen.classList.add("active");
     appScreen.classList.add("hidden");
@@ -150,7 +152,15 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 async function loadProviders() {
-    const code = localStorage.getItem("SECRET_PROVIDER_CODE");
+    let code = localStorage.getItem("SECRET_PROVIDER_CODE");
+    const codeTime = localStorage.getItem("SECRET_PROVIDER_CODE_TIME");
+    
+    if (code && codeTime && (Date.now() - parseInt(codeTime)) > 10 * 60 * 1000) {
+        localStorage.removeItem("SECRET_PROVIDER_CODE");
+        localStorage.removeItem("SECRET_PROVIDER_CODE_TIME");
+        code = null;
+    }
+    
     const url = code ? `/providers?code=${encodeURIComponent(code)}` : `/providers`;
     const providers = await apiFetch(url);
     providerSelect.innerHTML = "";
@@ -247,7 +257,15 @@ searchBtn.addEventListener("click", async () => {
     loading.classList.remove("hidden");
 
     try {
-        const code = localStorage.getItem("SECRET_PROVIDER_CODE");
+        let code = localStorage.getItem("SECRET_PROVIDER_CODE");
+        const codeTime = localStorage.getItem("SECRET_PROVIDER_CODE_TIME");
+        
+        if (code && codeTime && (Date.now() - parseInt(codeTime)) > 10 * 60 * 1000) {
+            localStorage.removeItem("SECRET_PROVIDER_CODE");
+            localStorage.removeItem("SECRET_PROVIDER_CODE_TIME");
+            code = null;
+        }
+
         const url = code ? `/search?q=${encodeURIComponent(q)}&code=${encodeURIComponent(code)}` : `/search?q=${encodeURIComponent(q)}`;
         const data = await apiFetch(url);
         renderResults(data.data || []);
@@ -807,6 +825,7 @@ if (commandPaletteOverlay) {
                 
                 if (fullx || providers.length > 0) {
                     localStorage.setItem("SECRET_PROVIDER_CODE", code);
+                    localStorage.setItem("SECRET_PROVIDER_CODE_TIME", Date.now().toString());
                     await loadProviders();
                     commandPaletteStatus.classList.remove("hidden");
                     commandPaletteStatus.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg><span>Hidden providers activated.</span>`;
