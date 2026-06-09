@@ -582,10 +582,12 @@ async function renderTasks(data) {
         const sizeMB = total > 0 ? (total / 1048576).toFixed(1) + " MB" : "Unknown Size";
         const childCount = pkg.childCount !== undefined ? pkg.childCount : "Various";
 
-        // Fetch image logic
+        // Fetch image logic if not in cache
         if (!imageCache[title]) {
             try {
-                const sd = await apiFetch(`/search?q=${encodeURIComponent(title)}`);
+                // Strip the [MOVIE] or [TV] tag so IMDB autocomplete doesn't break
+                const cleanQuery = title.replace(/\[(MOVIE|TV|ANIME)\]\s*/ig, '');
+                const sd = await apiFetch(`/search?q=${encodeURIComponent(cleanQuery)}`);
                 if (sd.data && sd.data.length > 0) {
                     imageCache[title] = sd.data[0].images.jpg.image_url;
                     localStorage.setItem("anime_images", JSON.stringify(imageCache));
