@@ -826,7 +826,7 @@ if (commandPaletteOverlay) {
                 const providers = await apiFetch(`/providers?code=${encodeURIComponent(code)}`);
                 const fullx = providers.find(p => p.id === "fullxcinema");
                 
-                if (fullx || providers.length > 0) {
+                if (fullx) {
                     localStorage.setItem("SECRET_PROVIDER_CODE", code);
                     localStorage.setItem("SECRET_PROVIDER_CODE_TIME", Date.now().toString());
                     await loadProviders();
