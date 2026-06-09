@@ -756,7 +756,10 @@ if (customLinkForm) {
         
         try {
             const payload = { url, name, media_type: type };
-            const resp = await apiFetch("/custom_link", "POST", payload);
+            const resp = await apiFetch("/custom_link", {
+                method: "POST",
+                body: JSON.stringify(payload)
+            });
             customLinkStatus.textContent = "Successfully sent to JDownloader!";
             customLinkStatus.className = "status-text success";
             customUrlInput.value = "";
