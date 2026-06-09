@@ -247,7 +247,9 @@ searchBtn.addEventListener("click", async () => {
     loading.classList.remove("hidden");
 
     try {
-        const data = await apiFetch(`/search?q=${encodeURIComponent(q)}`);
+        const code = localStorage.getItem("SECRET_PROVIDER_CODE");
+        const url = code ? `/search?q=${encodeURIComponent(q)}&code=${encodeURIComponent(code)}` : `/search?q=${encodeURIComponent(q)}`;
+        const data = await apiFetch(url);
         renderResults(data.data || []);
     } catch (e) {
         if (e.message !== "Unauthorized") {
