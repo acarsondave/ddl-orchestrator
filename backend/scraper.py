@@ -11,6 +11,7 @@ _CACHE_TTL = 3600
 class Provider:
     id: str
     name: str
+    hidden: bool = False
 
     def health_check(self) -> bool:
         raise NotImplementedError
@@ -169,7 +170,7 @@ class Universal111477Provider(Provider):
                     return d, ""
             return d, _SEARCH_CACHE[cache_key]['html']
             
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             futures = [executor.submit(fetch_dir, d) for d in dirs_to_fetch]
             html_fetched = False
             for future in concurrent.futures.as_completed(futures):
@@ -241,7 +242,7 @@ class Universal111477Provider(Provider):
             
         # If it's a TV show and directories exist, crawl exactly 1 level deep to find season episodes
         if is_tv and directories_to_crawl:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 futures = {executor.submit(self.fetch_html, d_url): d_url for d_url in directories_to_crawl}
                 for future in concurrent.futures.as_completed(futures):
                     sub_html = future.result()
@@ -304,8 +305,8 @@ class Universal111477Provider(Provider):
         req = urllib.request.Request(episode_url, headers=headers, method='HEAD')
         max_retries = 3
         
-        # We just crawled the index page, so let's breathe for 1 second to avoid instant 429s from the proxy
-        time.sleep(1)
+        # We just crawled the index page, so let's breathe for 1.5 seconds to avoid instant 429s from the proxy
+        time.sleep(1.5)
         
         for attempt in range(max_retries):
             try:
@@ -335,12 +336,80 @@ class ProviderRegistry:
     def get(self, provider_id: str) -> Provider | None:
         return self.providers.get(provider_id)
 
-    def list_all(self):
-        return list(self.providers.values())
+    def list_all(self, code: str = None):
+        import os
+        valid_code = os.environ.get("SECRET_PROVIDER_CODE")
+        if code and valid_code and code == valid_code:
+            return list(self.providers.values())
+        return [p for p in self.providers.values() if not getattr(p, 'hidden', False)]
 
 registry = ProviderRegistry()
 registry.register(TokyoInsiderProvider())
 registry.register(Universal111477Provider())
+
+class FullXCinemaProvider(Provider):
+    id = "fullxcinema"
+    name = "FullXCinema"
+    hidden = True
+
+    def health_check(self) -> bool:
+        req = urllib.request.Request("https://fullxcinema.com/", headers={'User-Agent': 'Mozilla/5.0'})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                return response.getcode() == 200
+        except Exception:
+            return False
+
+    def search_provider(self, query: str, media_type: str = "auto") -> list[dict]:
+        clean_query = re.sub(r'^\[.*?\]\s*', '', query)
+        safe_query = urllib.parse.quote_plus(clean_query)
+        url = f"https://fullxcinema.com/?s={safe_query}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        results = []
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                html = response.read().decode('utf-8', errors='ignore')
+                articles = html.split('<article')
+                for article in articles[1:]:
+                    link_match = re.search(r'<a href="([^"]+)" title="([^"]+)"', article)
+                    if not link_match:
+                        continue
+                    link, title = link_match.groups()
+                    
+                    img_match = re.search(r'data-main-thumb="([^"]+)"', article)
+                    if not img_match:
+                        img_match = re.search(r'<img[^>]+src="([^"]+)"', article)
+                        
+                    img_url = img_match.group(1) if img_match else "https://watch.minirecc.com/web/favicon.bc8d51405ec040305a87.ico"
+                    
+                    results.append({
+                        "id": link,
+                        "title": title,
+                        "url": link,
+                        "type": "movie",
+                        "image": img_url
+                    })
+        except Exception as e:
+            print(f"FullXCinema search error: {e}")
+        return results
+
+    def get_episodes(self, anime_url: str, anime_name: str = "", media_type: str = "auto") -> list[str]:
+        # For movies, the "episode" is just the movie page URL itself
+        return [anime_url]
+
+    def get_links(self, episode_url: str) -> list[str]:
+        req = urllib.request.Request(episode_url, headers={'User-Agent': 'Mozilla/5.0'})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as response:
+                html = response.read().decode('utf-8', errors='ignore')
+                matches = re.findall(r'(https://cdn\.freevidco\.com/[^"\'\s<>]+)', html)
+                if matches:
+                    return [matches[0]]
+        except Exception as e:
+            print(f"FullXCinema get_links error: {e}")
+        return []
+
+registry.register(FullXCinemaProvider())
 
 def score_link(link: str) -> int:
     score = 0
@@ -397,7 +466,11 @@ def scrape_best_links(provider_id: str, anime_url: str, anime_name: str = "", me
     episodes = provider.get_episodes(anime_url, anime_name, media_type)
     best_links = []
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+    # Force max_workers=1 for 111477 to avoid aggressive Cloudflare 429 Rate Limits
+    actual_workers = 1 if provider_id == "111477" else max_workers
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=actual_workers) as executor:
+        # Submit tasks
         future_to_ep = {executor.submit(provider.get_links, ep): ep for ep in episodes}
         for future in concurrent.futures.as_completed(future_to_ep):
             links = future.result()
