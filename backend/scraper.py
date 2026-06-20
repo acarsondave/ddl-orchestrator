@@ -145,7 +145,7 @@ class Universal111477Provider(Provider):
         return ""
 
     def health_check(self) -> bool:
-        html = self.fetch_html("https://a.111477.xyz/")
+        html = self.fetch_html("https://ldh10.971188.xyz/")
         return "Index of" in html or bool(html)
 
     def search_provider(self, query: str, media_type: str = "auto") -> list[dict]:
@@ -163,14 +163,14 @@ class Universal111477Provider(Provider):
         def fetch_dir(d):
             cache_key = f"111477_{d}"
             if cache_key not in _SEARCH_CACHE or time.time() - _SEARCH_CACHE[cache_key]['time'] > _CACHE_TTL:
-                html = self.fetch_html(f"https://a.111477.xyz{d}")
+                html = self.fetch_html(f"https://ldh10.971188.xyz{d}")
                 if html:
                     _SEARCH_CACHE[cache_key] = {'time': time.time(), 'html': html}
                 else:
                     return d, ""
             return d, _SEARCH_CACHE[cache_key]['html']
             
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(fetch_dir, d) for d in dirs_to_fetch]
             html_fetched = False
             for future in concurrent.futures.as_completed(futures):
@@ -202,7 +202,7 @@ class Universal111477Provider(Provider):
             if ratio > 0.4 or query_lower in name_clean:
                 results.append({
                     "title": f"{name} [{category}]",
-                    "url": "https://a.111477.xyz" + url_path,
+                    "url": "https://ldh10.971188.xyz" + url_path,
                     "score": ratio
                 })
                 
@@ -226,10 +226,10 @@ class Universal111477Provider(Provider):
                 if size_str and size_str.isdigit() and int(size_str) > MAX_BYTES:
                     continue
                     
-                full_url = urljoin("https://a.111477.xyz", url_path)
+                full_url = urljoin("https://ldh10.971188.xyz", url_path)
                 all_links.append((name, full_url))
             elif url_path.endswith('/') and name_lower not in ["asiandrama", "kdrama", "misc", "movies", "tvs"]:
-                full_url = urljoin("https://a.111477.xyz", url_path)
+                full_url = urljoin("https://ldh10.971188.xyz", url_path)
                 directories_to_crawl.append(full_url)
                 
         if media_type == "movie":
@@ -242,7 +242,7 @@ class Universal111477Provider(Provider):
             
         # If it's a TV show and directories exist, crawl exactly 1 level deep to find season episodes
         if is_tv and directories_to_crawl:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
                 futures = {executor.submit(self.fetch_html, d_url): d_url for d_url in directories_to_crawl}
                 for future in concurrent.futures.as_completed(futures):
                     sub_html = future.result()
@@ -253,7 +253,7 @@ class Universal111477Provider(Provider):
                             if sub_name_lower.endswith('.mkv') or sub_name_lower.endswith('.mp4'):
                                 if sub_size_str and sub_size_str.isdigit() and int(sub_size_str) > MAX_BYTES:
                                     continue
-                                sub_full = urljoin("https://a.111477.xyz", sub_url_path)
+                                sub_full = urljoin("https://ldh10.971188.xyz", sub_url_path)
                                 all_links.append((sub_name, sub_full))
         
         if is_movie and not is_tv:
@@ -305,8 +305,7 @@ class Universal111477Provider(Provider):
         req = urllib.request.Request(episode_url, headers=headers, method='HEAD')
         max_retries = 3
         
-        # We just crawled the index page, so let's breathe for 1.5 seconds to avoid instant 429s from the proxy
-        time.sleep(1.5)
+        # No sleep needed for premium endpoint
         
         for attempt in range(max_retries):
             try:
@@ -466,8 +465,8 @@ def scrape_best_links(provider_id: str, anime_url: str, anime_name: str = "", me
     episodes = provider.get_episodes(anime_url, anime_name, media_type)
     best_links = []
     
-    # Force max_workers=1 for 111477 to avoid aggressive Cloudflare 429 Rate Limits
-    actual_workers = 1 if provider_id == "111477" else max_workers
+    # Use default max_workers (5) since premium endpoint has no rate limit
+    actual_workers = max_workers
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=actual_workers) as executor:
         # Submit tasks

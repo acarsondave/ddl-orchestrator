@@ -67,6 +67,11 @@ class RequestAnimePayload(BaseModel):
     media_type: str = "auto"
     dry_run: bool = False
 
+class CustomLinkPayload(BaseModel):
+    url: str
+    name: str
+    media_type: str
+
 @app.post("/api/search_provider")
 def search_provider(payload: SearchProviderPayload, _=Depends(verify_token)):
     provider = registry.get(payload.provider_id)
@@ -80,9 +85,9 @@ def search_provider(payload: SearchProviderPayload, _=Depends(verify_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/providers")
-def list_providers(_=Depends(verify_token)):
+def list_providers(code: str = None, _=Depends(verify_token)):
     providers = []
-    for p in registry.list_all():
+    for p in registry.list_all(code):
         providers.append({
             "id": p.id,
             "name": p.name,
@@ -136,7 +141,7 @@ def search_imdb(query: str):
         return []
 
 @app.get("/api/search")
-async def search_anime(q: str, _=Depends(verify_token)):
+async def search_anime(q: str, code: str = None, _=Depends(verify_token)):
     imdb_results = await asyncio.to_thread(search_imdb, q)
     
     jikan_results = []
@@ -151,7 +156,25 @@ async def search_anime(q: str, _=Depends(verify_token)):
     except Exception:
         pass
         
-    return {"data": imdb_results[:8] + jikan_results[:5]}
+    fullx_results = []
+    import os
+    valid_code = os.environ.get("SECRET_PROVIDER_CODE")
+    if code and valid_code and code == valid_code:
+        p = registry.get("fullxcinema")
+        if p:
+            try:
+                res = await asyncio.to_thread(p.search_provider, q)
+                for r in res[:5]: # Limit to 5
+                    fullx_results.append({
+                        "title": f"[MOVIE] {r['title']}",
+                        "year": "FullXCinema",
+                        "images": {"jpg": {"image_url": r.get("image", "https://watch.minirecc.com/web/favicon.bc8d51405ec040305a87.ico")}},
+                        "fullx_url": r["url"]
+                    })
+            except Exception:
+                pass
+                
+    return {"data": imdb_results[:8] + jikan_results[:5] + fullx_results}
 
 @app.post("/api/request")
 def request_anime(payload: RequestAnimePayload, _=Depends(verify_token)):
@@ -169,6 +192,28 @@ def request_anime(payload: RequestAnimePayload, _=Depends(verify_token)):
         raise
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/custom_link")
+def process_custom_link(payload: CustomLinkPayload, _=Depends(verify_token)):
+    try:
+        url = payload.url.strip()
+        links = [url]
+        # Check if any provider can resolve it
+        if "fullxcinema.com" in url:
+            p = registry.get("fullxcinema")
+            if p:
+                extracted = p.get_links(url)
+                if extracted: links = extracted
+        elif "111477.xyz" in url or "971188.xyz" in url:
+            p = registry.get("111477")
+            if p:
+                extracted = p.get_links(url)
+                if extracted: links = extracted
+            
+        push_to_jdownloader(payload.name, links)
+        return {"status": "success", "message": "Pushed custom link to JDownloader."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
