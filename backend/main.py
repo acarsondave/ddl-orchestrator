@@ -7,6 +7,7 @@ import hmac
 from dotenv import load_dotenv
 from scraper import scrape_best_links, registry
 from jdownloader import push_to_jdownloader
+from subtitles import search_subtitles, get_subtitle_download_link
 
 load_dotenv()
 
@@ -70,6 +71,11 @@ class RequestAnimePayload(BaseModel):
 class CustomLinkPayload(BaseModel):
     url: str
     name: str
+
+class SubtitleDownloadPayload(BaseModel):
+    provider: str
+    file_id: str
+    package_name: str
     media_type: str
 
 @app.post("/api/search_provider")
@@ -222,5 +228,24 @@ def get_downloads(_=Depends(verify_token)):
     try:
         from jdownloader import get_downloads_status
         return get_downloads_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/subtitles/search")
+def api_search_subtitles(query: str, _=Depends(verify_token)):
+    try:
+        results = search_subtitles(query)
+        return {"status": "success", "data": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/subtitles/download")
+def api_download_subtitle(payload: SubtitleDownloadPayload, _=Depends(verify_token)):
+    try:
+        link = get_subtitle_download_link(payload.provider, payload.file_id)
+        if not link:
+            raise HTTPException(status_code=404, detail="Could not retrieve subtitle download link")
+        push_to_jdownloader(payload.package_name, [link])
+        return {"status": "success", "message": "Subtitle sent to JDownloader."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
