@@ -45,6 +45,7 @@
                 <nav class="header-nav">
                     <button id="nav-search" class="nav-link active">Search</button>
                     <button id="nav-custom-link" class="nav-link">Custom Link</button>
+                    <button id="nav-subtitles" class="nav-link">Subtitles</button>
                     <button id="nav-tasks" class="nav-link">Tasks</button>
                 </nav>
                 <button id="logout-btn" class="btn-secondary">Lock Session</button>
@@ -118,6 +119,24 @@
                 
                 <div id="tasks-grid" class="tasks-grid"></div>
             </div>
+
+            <!-- Subtitles View -->
+            <div id="view-subtitles" class="view hidden">
+                <div class="search-section">
+                    <div class="search-bar">
+                        <input type="text" id="subtitle-search-input" placeholder="Search subtitles by show name or filename...">
+                        <button id="subtitle-search-btn" class="btn-primary">Search</button>
+                    </div>
+                </div>
+
+                <div id="subtitle-loading" class="hidden">
+                    <div class="spinner"></div>
+                    <p class="loading-text">Querying subtitle providers...</p>
+                </div>
+
+                <!-- Subtitle Results List -->
+                <div id="subtitle-results-list" class="matches-list" style="margin-top: 24px; display: flex; flex-direction: column; gap: 8px;"></div>
+            </div>
         </main>
     </div>
 
@@ -178,6 +197,9 @@
                     <button id="test-extraction" class="btn-secondary" style="flex: 1; min-width: 100px;">
                         <span id="test-text">Dry Run</span>
                         <div id="test-spinner" class="spinner-small hidden"></div>
+                    </button>
+                    <button id="find-subtitles-inline-btn" class="btn-secondary" style="flex: 1; min-width: 120px; background-color: rgba(147, 51, 234, 0.1); color: #c084fc; border-color: rgba(147, 51, 234, 0.3);">
+                        Find Subtitles
                     </button>
                     <button id="submit-request" class="btn-primary" style="flex: 2; min-width: 150px;">
                         <span id="submit-text">Send to JDownloader</span>

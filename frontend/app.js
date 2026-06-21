@@ -13,8 +13,10 @@ const unlockSpinner = document.getElementById("unlock-spinner");
 // Navigation
 const navSearch = document.getElementById("nav-search");
 const navTasks = document.getElementById("nav-tasks");
+const navSubtitles = document.getElementById("nav-subtitles");
 const viewSearch = document.getElementById("view-search");
 const viewTasks = document.getElementById("view-tasks");
+const viewSubtitles = document.getElementById("view-subtitles");
 
 // Search View
 const searchInput = document.getElementById("search-input");
@@ -207,44 +209,37 @@ if (refreshProvidersBtn) {
 const navCustomLink = document.getElementById("nav-custom-link");
 const viewCustomLink = document.getElementById("view-custom-link");
 
-navSearch.addEventListener("click", () => {
-    navSearch.classList.add("active");
-    navTasks.classList.remove("active");
-    if(navCustomLink) navCustomLink.classList.remove("active");
-    viewSearch.classList.add("active");
-    viewSearch.classList.remove("hidden");
-    viewTasks.classList.remove("active");
-    viewTasks.classList.add("hidden");
-    if(viewCustomLink) { viewCustomLink.classList.remove("active"); viewCustomLink.classList.add("hidden"); }
-    stopPollingTasks();
-});
-
-if(navCustomLink) {
-    navCustomLink.addEventListener("click", () => {
-        navCustomLink.classList.add("active");
-        navSearch.classList.remove("active");
-        navTasks.classList.remove("active");
-        viewCustomLink.classList.add("active");
-        viewCustomLink.classList.remove("hidden");
-        viewSearch.classList.remove("active");
-        viewSearch.classList.add("hidden");
-        viewTasks.classList.remove("active");
-        viewTasks.classList.add("hidden");
-        stopPollingTasks();
+function switchTab(activeNav, activeView) {
+    const navs = [navSearch, navCustomLink, navSubtitles, navTasks];
+    const views = [viewSearch, viewCustomLink, viewSubtitles, viewTasks];
+    
+    navs.forEach(nav => {
+        if (nav) {
+            if (nav === activeNav) nav.classList.add("active");
+            else nav.classList.remove("active");
+        }
     });
+    
+    views.forEach(view => {
+        if (view) {
+            if (view === activeView) {
+                view.classList.add("active");
+                view.classList.remove("hidden");
+            } else {
+                view.classList.remove("active");
+                view.classList.add("hidden");
+            }
+        }
+    });
+    
+    if (activeNav !== navTasks) stopPollingTasks();
+    else startPollingTasks();
 }
 
-navTasks.addEventListener("click", () => {
-    navTasks.classList.add("active");
-    navSearch.classList.remove("active");
-    if(navCustomLink) navCustomLink.classList.remove("active");
-    viewTasks.classList.add("active");
-    viewTasks.classList.remove("hidden");
-    viewSearch.classList.remove("active");
-    viewSearch.classList.add("hidden");
-    if(viewCustomLink) { viewCustomLink.classList.remove("active"); viewCustomLink.classList.add("hidden"); }
-    startPollingTasks();
-});
+navSearch.addEventListener("click", () => switchTab(navSearch, viewSearch));
+if (navCustomLink) navCustomLink.addEventListener("click", () => switchTab(navCustomLink, viewCustomLink));
+if (navSubtitles) navSubtitles.addEventListener("click", () => switchTab(navSubtitles, viewSubtitles));
+navTasks.addEventListener("click", () => switchTab(navTasks, viewTasks));
 
 // ------------------------------------
 // Search View
@@ -879,5 +874,147 @@ if (commandPaletteOverlay) {
         setTimeout(() => {
             commandPaletteOverlay.classList.add("hidden");
         }, 200);
+    }
+}
+
+// ------------------------------------
+// Subtitles View Logic
+// ------------------------------------
+const subtitleSearchInput = document.getElementById("subtitle-search-input");
+const subtitleSearchBtn = document.getElementById("subtitle-search-btn");
+const subtitleLoading = document.getElementById("subtitle-loading");
+const subtitleResultsList = document.getElementById("subtitle-results-list");
+const findSubtitlesInlineBtn = document.getElementById("find-subtitles-inline-btn");
+
+if (findSubtitlesInlineBtn) {
+    findSubtitlesInlineBtn.addEventListener("click", () => {
+        const query = modalAnimeName.textContent;
+        requestModal.classList.add("hidden");
+        switchTab(navSubtitles, viewSubtitles);
+        subtitleSearchInput.value = query;
+        performSubtitleSearch(query);
+    });
+}
+
+if (subtitleSearchBtn) {
+    subtitleSearchBtn.addEventListener("click", () => {
+        const query = subtitleSearchInput.value.trim();
+        if (query) performSubtitleSearch(query);
+    });
+}
+
+if (subtitleSearchInput) {
+    subtitleSearchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            const query = subtitleSearchInput.value.trim();
+            if (query) performSubtitleSearch(query);
+        }
+    });
+}
+
+async function performSubtitleSearch(query) {
+    subtitleResultsList.innerHTML = "";
+    subtitleLoading.classList.remove("hidden");
+    
+    try {
+        const res = await apiFetch(`/subtitles/search?query=${encodeURIComponent(query)}`);
+        const data = res.data || [];
+        
+        if (data.length === 0) {
+            subtitleResultsList.innerHTML = `<div class="text-muted" style="padding: 20px; text-align: center;">No subtitles found for "${query}"</div>`;
+            return;
+        }
+        
+        data.forEach(sub => {
+            const card = document.createElement("div");
+            card.style.background = "var(--bg-tertiary)";
+            card.style.padding = "16px";
+            card.style.borderRadius = "8px";
+            card.style.border = "1px solid var(--border-color)";
+            card.style.display = "flex";
+            card.style.flexDirection = "column";
+            card.style.gap = "12px";
+            
+            const header = document.createElement("div");
+            header.style.display = "flex";
+            header.style.justifyContent = "space-between";
+            header.style.alignItems = "flex-start";
+            
+            const titleContainer = document.createElement("div");
+            const title = document.createElement("div");
+            title.style.fontWeight = "500";
+            title.style.fontSize = "14px";
+            title.style.color = "var(--text-primary)";
+            title.style.wordBreak = "break-all";
+            title.textContent = sub.filename;
+            
+            const meta = document.createElement("div");
+            meta.style.fontSize = "12px";
+            meta.style.color = "var(--text-muted)";
+            meta.style.marginTop = "4px";
+            meta.textContent = `Provider: ${sub.provider} | Lang: ${sub.language} | Downloads: ${sub.downloads}`;
+            
+            titleContainer.appendChild(title);
+            titleContainer.appendChild(meta);
+            header.appendChild(titleContainer);
+            
+            const actions = document.createElement("div");
+            actions.style.display = "flex";
+            actions.style.gap = "8px";
+            actions.style.alignItems = "center";
+            
+            const pkgInput = document.createElement("input");
+            pkgInput.type = "text";
+            pkgInput.value = query.replace("[TV] ", "").replace("[ANIME] ", "").replace("[MOVIE] ", "");
+            pkgInput.placeholder = "JDownloader Package Name";
+            pkgInput.style.padding = "6px 10px";
+            pkgInput.style.fontSize = "12px";
+            pkgInput.style.width = "200px";
+            
+            const dlBtn = document.createElement("button");
+            dlBtn.className = "btn-primary";
+            dlBtn.style.padding = "6px 12px";
+            dlBtn.style.fontSize = "12px";
+            dlBtn.textContent = "Send to JD";
+            
+            dlBtn.addEventListener("click", async () => {
+                const pkgName = pkgInput.value.trim();
+                if (!pkgName) return alert("Please enter a package name");
+                
+                dlBtn.disabled = true;
+                dlBtn.textContent = "Sending...";
+                
+                try {
+                    await apiFetch("/subtitles/download", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            provider: sub.provider,
+                            file_id: sub.id,
+                            package_name: `[TV] ${pkgName}` // Default to TV for sorting
+                        })
+                    });
+                    dlBtn.style.backgroundColor = "#10b981";
+                    dlBtn.style.borderColor = "#10b981";
+                    dlBtn.textContent = "Sent!";
+                } catch (err) {
+                    alert("Error: " + err.message);
+                    dlBtn.disabled = false;
+                    dlBtn.textContent = "Send to JD";
+                }
+            });
+            
+            actions.appendChild(pkgInput);
+            actions.appendChild(dlBtn);
+            
+            card.appendChild(header);
+            card.appendChild(actions);
+            
+            subtitleResultsList.appendChild(card);
+        });
+        
+    } catch (e) {
+        subtitleResultsList.innerHTML = `<div class="error-text" style="padding: 20px; text-align: center;">Error fetching subtitles: ${e.message}</div>`;
+    } finally {
+        subtitleLoading.classList.add("hidden");
     }
 }
